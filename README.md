@@ -3,3 +3,16 @@ OpenGL simple app
 * prereqs - conan, cmake
 * deps - glfw, glew, imgui, glm
 * run.cmd/run.sh
+
+## How to build?
+
+First time – `./build.sh`
+
+Next time – `cmake  --build build --target opengl-imgui-sample`
+
+## How to run?
+
+```shell script
+cd build
+./opengl-imgui-sample
+```
