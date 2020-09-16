@@ -4,16 +4,38 @@ out vec4 o_frag_color;
 
 struct vx_output_t
 {
-    vec3 color;
+    vec3 position;
 };
 
 in vx_output_t v_out;
 
-uniform vec3 u_color;
-uniform float u_time;
+uniform float u_max_radius;
+uniform int u_max_iterations;
+
+uniform vec2 u_shift;
+uniform float u_scale;
+
+uniform sampler1D colormap;
 
 void main()
 {
-    float animation = 0.5 + sin(5 * u_time) * sin(5 * u_time);
-    o_frag_color = vec4(animation * v_out.color * u_color,1.0);
+    vec2 position = v_out.position.xy * u_scale + u_shift;
+
+    float x = position.x;
+    float y = position.y;
+    float ix = 0;
+    float iy = 0;
+    int n = 0;
+
+    while ((ix * ix + iy * iy < u_max_radius) && (n < u_max_iterations)) {
+        ix = x * x - y * y + position.x;
+        iy = 2 * x * y + position.y;
+
+        x = ix;
+        y = iy;
+
+        n++;
+    }
+
+    o_frag_color = texture(colormap, float(n) / float(u_max_iterations) - 0.01);
 }

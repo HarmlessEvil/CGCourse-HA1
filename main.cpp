@@ -17,6 +17,11 @@
 // Math constant and routines for OpenGL interop
 #include <glm/gtc/constants.hpp>
 
+#include "stb_image.h"
+
+#include <glm/glm.hpp>
+#include <glm/vec2.hpp>
+
 #include "opengl_shader.h"
 
 static void glfw_error_callback(int error, const char *description)
@@ -24,21 +29,52 @@ static void glfw_error_callback(int error, const char *description)
    std::cerr << fmt::format("Glfw Error {}: {}\n", error, description);
 }
 
+unsigned int load_colormap()
+{
+   int width, height, channel_amount;
+   unsigned char *data = stbi_load(
+           "palettes/spectral_colormap.png",
+           &width,
+           &height,
+           &channel_amount,
+           0
+   );
+
+   if (!data) {
+      throw std::runtime_error("Failed to load texture");
+   }
+
+   unsigned int texture;
+   glGenTextures(1, &texture);
+   glBindTexture(GL_TEXTURE_1D, texture);
+
+   glTexImage1D(
+           GL_TEXTURE_1D,
+           0,
+           channel_amount == 3 ? GL_RGB : GL_RGBA,
+           width,
+           0,
+           channel_amount == 3 ? GL_RGB : GL_RGBA,
+           GL_UNSIGNED_BYTE, data
+   );
+   glGenerateMipmap(GL_TEXTURE_1D);
+
+   stbi_image_free(data);
+
+   return texture;
+}
+
 void create_triangle(GLuint &vbo, GLuint &vao, GLuint &ebo)
 {
    // create the triangle
    float triangle_vertices[] = {
-       0.0f, 0.25f, 0.0f,	// position vertex 1
-       1.0f, 0.0f, 0.0f,	 // color vertex 1
-
-       0.25f, -0.25f, 0.0f,  // position vertex 1
-       0.0f, 1.0f, 0.0f,	 // color vertex 1
-
-       -0.25f, -0.25f, 0.0f, // position vertex 1
-       0.0f, 0.0f, 1.0f,	 // color vertex 1
+       -1.0f, -1.0f, 0.0f,	 // position vertex 1
+        1.0f, -1.0f, 0.0f,  // position vertex 2
+       -1.0f,  1.0f, 0.0f,  // position vertex 3
+        1.0f,  1.0f, 0.0f,  // position vertex 4
    };
    unsigned int triangle_indices[] = {
-       0, 1, 2 };
+       0, 1, 2, 2, 3, 1 };
    glGenVertexArrays(1, &vao);
    glGenBuffers(1, &vbo);
    glGenBuffers(1, &ebo);
@@ -47,13 +83,16 @@ void create_triangle(GLuint &vbo, GLuint &vao, GLuint &ebo)
    glBufferData(GL_ARRAY_BUFFER, sizeof(triangle_vertices), triangle_vertices, GL_STATIC_DRAW);
    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(triangle_indices), triangle_indices, GL_STATIC_DRAW);
-   glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)0);
+   glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *)0);
    glEnableVertexAttribArray(0);
-   glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)(3 * sizeof(float)));
-   glEnableVertexAttribArray(1);
    glBindBuffer(GL_ARRAY_BUFFER, 0);
    glBindVertexArray(0);
 }
+
+struct mouse_state {
+    bool is_dragging = false;
+    ImVec2 last_drag_delta = {0, 0};
+};
 
 int main(int, char **)
 {
@@ -68,10 +107,10 @@ int main(int, char **)
    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-   //glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);            // 3.0+ only
+   glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);            // 3.0+ only
 
    // Create window with graphics context
-   GLFWwindow *window = glfwCreateWindow(1280, 720, "Dear ImGui - Conan", NULL, NULL);
+   GLFWwindow *window = glfwCreateWindow(1280, 1280, "Dear ImGui - Conan", NULL, NULL);
    if (window == NULL)
       return 1;
    glfwMakeContextCurrent(window);
@@ -87,6 +126,7 @@ int main(int, char **)
    // create our geometries
    GLuint vbo, vao, ebo;
    create_triangle(vbo, vao, ebo);
+   unsigned int colormap = load_colormap();
 
    // init shader
    shader_t triangle_shader("simple-shader.vs", "simple-shader.fs");
@@ -98,6 +138,11 @@ int main(int, char **)
    ImGui_ImplGlfw_InitForOpenGL(window, true);
    ImGui_ImplOpenGL3_Init(glsl_version);
    ImGui::StyleColorsDark();
+
+   mouse_state mouse_state{};
+
+   glm::vec2 shift = {0, 0};
+   float scale = 1;
 
    auto const start_time = std::chrono::steady_clock::now();
 
@@ -122,28 +167,77 @@ int main(int, char **)
       ImGui::NewFrame();
 
       // GUI
-      ImGui::Begin("Triangle Position/Color");
-      static float rotation = 0.0;
-      ImGui::SliderFloat("rotation", &rotation, 0, 2 * glm::pi<float>());
-      static float translation[] = { 0.0, 0.0 };
-      ImGui::SliderFloat2("position", translation, -1.0, 1.0);
-      static float color[4] = { 1.0f,1.0f,1.0f,1.0f };
-      ImGui::ColorEdit3("color", color);
+      ImGui::Begin("Settings");
+      ImGui::Text("Fractal options");
+      static float max_radius = 130.0;
+      ImGui::SliderFloat("radius", &max_radius, 2, 1000);
+      static int max_iterations = 64;
+      ImGui::SliderInt("iterations", &max_iterations, 10, 400);
+
+      ImGui::Separator();
+
+      ImGui::Text("Other settings");
+      static float scale_sensitivity = 0.25f;
+      ImGui::SliderFloat("scale sensitivity", &scale_sensitivity, 0.01f, 0.5f);
+
       ImGui::End();
 
+       float mouse_delta = std::abs(io.MouseWheel);
+       if (!io.WantCaptureMouse && mouse_delta > 0.01) {
+           glm::vec2 world_position_before {
+               (io.MousePos.x / io.DisplaySize.x * 2 - 1) * scale,
+               (io.MousePos.y / io.DisplaySize.y * 2 - 1) * scale
+           };
+
+           if (io.MouseWheel > 0) {
+               scale /= 1 + mouse_delta * scale_sensitivity;
+           } else {
+               scale *= 1 + mouse_delta * scale_sensitivity;
+           }
+
+           glm::vec2 world_position_after {
+                   (io.MousePos.x / io.DisplaySize.x * 2 - 1) * scale,
+                   (io.MousePos.y / io.DisplaySize.y * 2 - 1) * scale
+           };
+
+           auto &&delta = world_position_after - world_position_before;
+
+           shift.x -= delta.x;
+           shift.y += delta.y;
+       }
+
+      if (!io.WantCaptureMouse && ImGui::IsMouseDragging()) {
+          mouse_state.is_dragging = true;
+          mouse_state.last_drag_delta = ImGui::GetMouseDragDelta();
+
+          mouse_state.last_drag_delta.x = mouse_state.last_drag_delta.x / io.DisplaySize.x * io.DisplayFramebufferScale.x;
+          mouse_state.last_drag_delta.y = mouse_state.last_drag_delta.y / io.DisplaySize.y * io.DisplayFramebufferScale.y;
+      } else if (mouse_state.is_dragging) {
+          mouse_state.is_dragging = false;
+
+          shift.x -= mouse_state.last_drag_delta.x * scale;
+          shift.y += mouse_state.last_drag_delta.y * scale;
+
+          mouse_state.last_drag_delta = {0, 0};
+      }
+
       // Pass the parameters to the shader as uniforms
-      triangle_shader.set_uniform("u_rotation", rotation);
-      triangle_shader.set_uniform("u_translation", translation[0], translation[1]);
-      float const time_from_start = (float)(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start_time).count() / 1000.0);
-      triangle_shader.set_uniform("u_time", time_from_start);
-      triangle_shader.set_uniform("u_color", color[0], color[1], color[2]);
+      triangle_shader.set_uniform("u_max_radius", max_radius);
+      triangle_shader.set_uniform("u_max_iterations", max_iterations);
+      triangle_shader.set_uniform(
+              "u_shift",
+              shift.x - mouse_state.last_drag_delta.x * scale,
+              shift.y + mouse_state.last_drag_delta.y * scale
+      );
+      triangle_shader.set_uniform("u_scale", scale);
 
       // Bind triangle shader
       triangle_shader.use();
       // Bind vertex array = buffers + indices
+      glBindTexture(GL_TEXTURE_1D, colormap);
       glBindVertexArray(vao);
       // Execute draw call
-      glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_INT, 0);
+      glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
       glBindVertexArray(0);
 
       // Generate gui render commands

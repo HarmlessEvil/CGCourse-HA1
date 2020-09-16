@@ -11,6 +11,10 @@ find_package(glew CONFIG)
 find_package(fmt CONFIG)
 find_package(glm CONFIG)
 
+set(CMAKE_CXX_STANDARD 11)
+
+include_directories(includes)
+
 add_executable( opengl-imgui-sample
                 main.cpp
                 opengl_shader.cpp
@@ -20,12 +24,20 @@ add_executable( opengl-imgui-sample
                 bindings/imgui_impl_glfw.h
                 bindings/imgui_impl_opengl3.h
                 assets/simple-shader.vs
-                assets/simple-shader.fs )
+                assets/simple-shader.fs
+                lib/stb_image.cpp )
 
 add_custom_command(TARGET opengl-imgui-sample
     POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_SOURCE_DIR}/assets/simple-shader.vs ${PROJECT_BINARY_DIR}
     COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_SOURCE_DIR}/assets/simple-shader.fs ${PROJECT_BINARY_DIR}
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${PROJECT_SOURCE_DIR}/assets/palettes/ ${PROJECT_BINARY_DIR}/palettes
+)
+
+install(FILES
+        ${PROJECT_SOURCE_DIR}/assets/simple-shader.vs
+        ${PROJECT_SOURCE_DIR}/assets/simple-shader.fs
+        DESTINATION ${PROJECT_BINARY_DIR}
 )
 
 target_compile_definitions(opengl-imgui-sample PUBLIC IMGUI_IMPL_OPENGL_LOADER_GLEW)
