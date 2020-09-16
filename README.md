@@ -6,9 +6,7 @@ OpenGL simple app
 
 ## How to build?
 
-First time – `./build.sh`
-
-Next time – `cmake -DCMAKE_BUILD_TYPE=Release --build build --target opengl-imgui-sample`
+`./build.sh`
 
 ## How to run?
 
