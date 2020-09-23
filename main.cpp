@@ -207,16 +207,11 @@ int main(int, char **)
        }
 
       if (!io.WantCaptureMouse && ImGui::IsMouseDragging()) {
-          auto delta = ImGui::GetMouseDragDelta();
+         auto delta = ImGui::GetMouseDragDelta();
 
-          delta.x = delta.x / io.DisplaySize.x * io.DisplayFramebufferScale.x * scale;
-          delta.y = delta.y / io.DisplaySize.y * io.DisplayFramebufferScale.y * scale;
+         delta.x = delta.x / io.DisplaySize.x * 2 * scale;
+         delta.y = delta.y / io.DisplaySize.y * 2 * scale;
 
-#if !__APPLE__
-          delta.x *= 2;
-          delta.y *= 2;
-#endif
-          
          shift.x -= delta.x;
          shift.y += delta.y;
 
