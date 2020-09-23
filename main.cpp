@@ -207,33 +207,26 @@ int main(int, char **)
        }
 
       if (!io.WantCaptureMouse && ImGui::IsMouseDragging()) {
-          mouse_state.is_dragging = true;
-          mouse_state.last_drag_delta = ImGui::GetMouseDragDelta();
+          auto delta = ImGui::GetMouseDragDelta();
 
-          mouse_state.last_drag_delta.x = mouse_state.last_drag_delta.x / io.DisplaySize.x * io.DisplayFramebufferScale.x;
-          mouse_state.last_drag_delta.y = mouse_state.last_drag_delta.y / io.DisplaySize.y * io.DisplayFramebufferScale.y;
+          delta.x = delta.x / io.DisplaySize.x * io.DisplayFramebufferScale.x * scale;
+          delta.y = delta.y / io.DisplaySize.y * io.DisplayFramebufferScale.y * scale;
 
 #if !__APPLE__
-          mouse_state.last_drag_delta.x *= 2;
-          mouse_state.last_drag_delta.y *= 2;
+          delta.x *= 2;
+          delta.y *= 2;
 #endif
-      } else if (mouse_state.is_dragging) {
-          mouse_state.is_dragging = false;
+          
+         shift.x -= delta.x;
+         shift.y += delta.y;
 
-          shift.x -= mouse_state.last_drag_delta.x * scale;
-          shift.y += mouse_state.last_drag_delta.y * scale;
-
-          mouse_state.last_drag_delta = {0, 0};
+         ImGui::ResetMouseDragDelta();
       }
 
       // Pass the parameters to the shader as uniforms
       triangle_shader.set_uniform("u_max_radius", max_radius);
       triangle_shader.set_uniform("u_max_iterations", max_iterations);
-      triangle_shader.set_uniform(
-              "u_shift",
-              shift.x - mouse_state.last_drag_delta.x * scale,
-              shift.y + mouse_state.last_drag_delta.y * scale
-      );
+      triangle_shader.set_uniform("u_shift", shift.x, shift.y);
       triangle_shader.set_uniform("u_scale", scale);
 
       // Bind triangle shader
