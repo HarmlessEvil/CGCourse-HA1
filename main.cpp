@@ -214,7 +214,8 @@ int main(int, char **)
           mouse_state.last_drag_delta.y = mouse_state.last_drag_delta.y / io.DisplaySize.y * io.DisplayFramebufferScale.y;
 
 #if !__APPLE__
-          mouse_state.last_drag_delta *= 2;
+          mouse_state.last_drag_delta.x *= 2;
+          mouse_state.last_drag_delta.y *= 2;
 #endif
       } else if (mouse_state.is_dragging) {
           mouse_state.is_dragging = false;
