@@ -89,11 +89,6 @@ void create_triangle(GLuint &vbo, GLuint &vao, GLuint &ebo)
    glBindVertexArray(0);
 }
 
-struct mouse_state {
-    bool is_dragging = false;
-    ImVec2 last_drag_delta = {0, 0};
-};
-
 int main(int, char **)
 {
    // Use GLFW to create a simple window
@@ -138,8 +133,6 @@ int main(int, char **)
    ImGui_ImplGlfw_InitForOpenGL(window, true);
    ImGui_ImplOpenGL3_Init(glsl_version);
    ImGui::StyleColorsDark();
-
-   mouse_state mouse_state{};
 
    glm::vec2 shift = {0, 0};
    float scale = 1;
@@ -209,11 +202,9 @@ int main(int, char **)
       if (!io.WantCaptureMouse && ImGui::IsMouseDragging()) {
          auto delta = ImGui::GetMouseDragDelta();
 
-         delta.x = delta.x / io.DisplaySize.x * 2 * scale;
-         delta.y = delta.y / io.DisplaySize.y * 2 * scale;
-
-         shift.x -= delta.x;
-         shift.y += delta.y;
+         // mouse_x / display_width -> [0..1] * 2 -> [0..2]: Because OpenGL screen length is |[-1..1]| = 2
+         shift.x -= delta.x / io.DisplaySize.x * 2 * scale;
+         shift.y += delta.y / io.DisplaySize.y * 2 * scale;delta.y;
 
          ImGui::ResetMouseDragDelta();
       }
