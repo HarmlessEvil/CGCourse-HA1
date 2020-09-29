@@ -218,6 +218,7 @@ int main(int, char **)
       // Bind triangle shader
       triangle_shader.use();
       // Bind vertex array = buffers + indices
+      glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_1D, colormap);
       glBindVertexArray(vao);
       // Execute draw call
