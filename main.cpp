@@ -21,6 +21,9 @@
 
 #include <stb_image.h>
 
+// Tiny .obj loader
+#define TINYOBJLOADER_IMPLEMENTATION
+#include <tiny_obj_loader.h>
 
 // Math constant and routines for OpenGL interop
 #include <glm/gtc/constants.hpp>
@@ -84,6 +87,132 @@ void load_image(GLuint &texture) {
     stbi_image_free(image);
 }
 
+struct draw_object {
+    GLuint vao;
+    GLuint vbo;
+    GLuint ebo;
+
+    std::size_t triangles_count;
+
+    friend std::ostream &operator<<(std::ostream &os, const draw_object &object) {
+        os << "vao: " << object.vao << " vbo: " << object.vbo << " ebo: " << object.ebo << " triangles_count: "
+           << object.triangles_count;
+        return os;
+    }
+};
+
+void load_model(std::vector<draw_object>& object_to_draw) {
+    std::string path = "assets/models/cube.obj";
+    tinyobj::attrib_t attrib;
+
+    std::vector<tinyobj::shape_t> shapes;
+    std::vector<tinyobj::material_t> materials;
+
+    std::string err;
+
+    bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &err, path.c_str());
+
+    if (!err.empty()) {
+        std::cerr << err << std::endl;
+    }
+
+    if (!ret) {
+        exit(1);
+    }
+
+    // Append default material
+    materials.push_back({});
+
+    for (const auto &shape : shapes) {
+        auto& mesh = shape.mesh;
+
+        // position: float3, normal: float3, texCoords: float2
+        std::vector<float> buffer;
+
+        for (std::size_t f = 0; f < mesh.indices.size() / 3; ++f) {
+            tinyobj::index_t idx0 = mesh.indices[3 * f + 0];
+            tinyobj::index_t idx1 = mesh.indices[3 * f + 1];
+            tinyobj::index_t idx2 = mesh.indices[3 * f + 2];
+
+            float texture_coords[3][2];
+            texture_coords[0][0] = attrib.texcoords[2 * idx0.texcoord_index];
+            texture_coords[0][1] = 1.0f - attrib.texcoords[2 * idx0.texcoord_index + 1];
+
+            texture_coords[1][0] = attrib.texcoords[2 * idx1.texcoord_index];
+            texture_coords[1][1] = 1.0f - attrib.texcoords[2 * idx1.texcoord_index + 1];
+
+            texture_coords[2][0] = attrib.texcoords[2 * idx2.texcoord_index];
+            texture_coords[2][1] = 1.0f - attrib.texcoords[2 * idx2.texcoord_index + 1];
+
+            float v[3][3];
+            for (std::size_t k = 0; k < 3; ++k) {
+                int f0 = idx0.vertex_index;
+                int f1 = idx1.vertex_index;
+                int f2 = idx2.vertex_index;
+
+                v[0][k] = attrib.vertices[3 * f0 + k];
+                v[1][k] = attrib.vertices[3 * f1 + k];
+                v[2][k] = attrib.vertices[3 * f2 + k];
+            }
+
+            float n[3][3];
+            for (std::size_t k = 0; k < 3; ++k) {
+                int nf0 = idx0.normal_index;
+                int nf1 = idx1.normal_index;
+                int nf2 = idx2.normal_index;
+
+                n[0][k] = attrib.normals[3 * nf0 + k];
+                n[1][k] = attrib.normals[3 * nf1 + k];
+                n[2][k] = attrib.normals[3 * nf2 + k];
+            }
+
+            for (std::size_t k = 0; k < 3; ++k) {
+                buffer.push_back(v[k][0]);
+                buffer.push_back(v[k][1]);
+                buffer.push_back(v[k][2]);
+
+                buffer.push_back(n[k][0]);
+                buffer.push_back(n[k][1]);
+                buffer.push_back(n[k][2]);
+
+                buffer.push_back(texture_coords[k][0]);
+                buffer.push_back(texture_coords[k][1]);
+            }
+        }
+
+        draw_object object{};
+
+        glGenVertexArrays(1, &object.vao);
+        glGenBuffers(1, &object.vbo);
+        glGenBuffers(1, &object.ebo);
+        glBindVertexArray(object.vao);
+
+        glBindBuffer(GL_ARRAY_BUFFER, object.vbo);
+        glBufferData(GL_ARRAY_BUFFER, buffer.size() * sizeof(float), buffer.data(), GL_STATIC_DRAW);
+
+        object.triangles_count = buffer.size() / (3 + 3 + 2) / 3;
+        std::vector<unsigned int> indices(object.triangles_count * 3);
+        for (std::size_t i = 0; i < indices.size(); ++i) {
+            indices[i] = i;
+        }
+
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, object.ebo);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), indices.data(), GL_STATIC_DRAW);
+
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *) 0);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *) (3 * sizeof(float)));
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *) (6 * sizeof(float)));
+        glEnableVertexAttribArray(2);
+
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        glBindVertexArray(0);
+
+        object_to_draw.push_back(object);
+    }
+}
+
 int main(int, char **) {
     // Use GLFW to create a simple window
     glfwSetErrorCallback(glfw_error_callback);
@@ -114,9 +243,8 @@ int main(int, char **) {
     GLuint texture;
     load_image(texture);
 
-    // create our geometries
-    GLuint vbo, vao, ebo;
-    create_triangle(vbo, vao, ebo);
+    std::vector<draw_object> objects_to_draw{};
+    load_model(objects_to_draw);
 
     // init shader
     shader_t triangle_shader(
@@ -147,7 +275,7 @@ int main(int, char **) {
         // Fill background with solid color
         glClearColor(0.30f, 0.55f, 0.60f, 1.00f);
         glClear(GL_COLOR_BUFFER_BIT);
-        //glEnable(GL_CULL_FACE);
+        glEnable(GL_CULL_FACE);
 
         // Gui start new frame
         ImGui_ImplOpenGL3_NewFrame();
@@ -176,7 +304,7 @@ int main(int, char **) {
 
         auto model = glm::rotate(glm::mat4(1), glm::radians(rotation * 60), glm::vec3(0, 1, 0)) *
                      glm::scale(glm::vec3(2, 2, 2));
-        auto view = glm::lookAt<float>(glm::vec3(0, 0, -1), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+        auto view = glm::lookAt<float>(glm::vec3(0, 0, -3), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
         auto projection = glm::perspective<float>(90, float(display_w) / display_h, 0.1, 100);
         auto mvp = projection * view * model;
         //glm::mat4 identity(1.0);
@@ -191,10 +319,11 @@ int main(int, char **) {
         glBindTexture(GL_TEXTURE_2D, texture);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        // Bind vertex array = buffers + indices
-        glBindVertexArray(vao);
-        // Execute draw call
-        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
+        for (const auto &object : objects_to_draw) {
+            glBindVertexArray(object.vao);
+            glDrawElements(GL_TRIANGLES, 3 * object.triangles_count, GL_UNSIGNED_INT, 0);
+        }
         glBindTexture(GL_TEXTURE_2D, 0);
         glBindVertexArray(0);
 
