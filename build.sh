@@ -11,3 +11,4 @@ export CONAN_SYSREQUIRES_MODE=enabled
 conan install ..
 cmake .. -DCMAKE_BUILD_TYPE=Release
 cmake --build .
+cmake --install .
