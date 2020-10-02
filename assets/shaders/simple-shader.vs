@@ -2,12 +2,15 @@
 
 layout (location = 0) in vec3 in_position;
 layout (location = 1) in vec3 in_normal;
-layout (location = 2) in vec2 in_texture_coord;
+layout (location = 2) in vec3 in_ambient;
+layout (location = 3) in vec3 in_diffuse;
+layout (location = 4) in vec2 in_texture_coord;
 
 struct vx_output_t
 {
     vec3 normal;
-    vec3 color;
+    vec3 ambient;
+    vec3 diffuse;
 
     vec2 texture_coord;
 };
@@ -24,7 +27,8 @@ void main()
     //rotated_pos.y = u_translation.y + in_position.x * sin(u_rotation) + in_position.y * cos(u_rotation);
 
     v_out.normal = in_normal;
-    v_out.color = vec3(1.0, 1.0, 1.0);
+    v_out.ambient = in_ambient;
+    v_out.diffuse = in_diffuse;
 
     v_out.texture_coord = in_texture_coord;
 

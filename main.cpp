@@ -1,8 +1,10 @@
 #pragma optimize("", off)
 
 #include <iostream>
+#include <filesystem>
 #include <vector>
 #include <chrono>
+#include <unordered_map>
 
 #include <fmt/format.h>
 
@@ -23,6 +25,7 @@
 
 // Tiny .obj loader
 #define TINYOBJLOADER_IMPLEMENTATION
+
 #include <tiny_obj_loader.h>
 
 // Math constant and routines for OpenGL interop
@@ -70,18 +73,16 @@ void create_triangle(GLuint &vbo, GLuint &vao, GLuint &ebo) {
     glBindVertexArray(0);
 }
 
-void load_image(GLuint &texture) {
+void load_image(std::string const &path, GLuint &texture) {
     int width, height, channels;
+
     stbi_set_flip_vertically_on_load(true);
-    unsigned char *image = stbi_load("assets/images/checkers.jpg",
-                                     &width,
-                                     &height,
-                                     &channels,
-                                     STBI_rgb);
+    unsigned char *image = stbi_load(path.c_str(), &width, &height, &channels, STBI_rgb);
 
     glGenTextures(1, &texture);
     glBindTexture(GL_TEXTURE_2D, texture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, image);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, texture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, image);
     glGenerateMipmap(GL_TEXTURE_2D);
 
     stbi_image_free(image);
@@ -92,25 +93,29 @@ struct draw_object {
     GLuint vbo;
     GLuint ebo;
 
-    std::size_t triangles_count;
+    std::size_t material_id;
 
-    friend std::ostream &operator<<(std::ostream &os, const draw_object &object) {
-        os << "vao: " << object.vao << " vbo: " << object.vbo << " ebo: " << object.ebo << " triangles_count: "
-           << object.triangles_count;
-        return os;
-    }
+    std::size_t triangles_count;
 };
 
-void load_model(std::vector<draw_object>& object_to_draw) {
-    std::string path = "assets/models/cube.obj";
+// Loads model from .obj file. Assumes that if the model uses some material defined in .mtl file, the material is stored
+// in exact same directory as the .obj file itself.
+void load_model(
+        std::vector<draw_object> &object_to_draw,
+        std::vector<tinyobj::material_t> &materials,
+        std::unordered_map<std::string, GLuint> &textures,
+        std::filesystem::path const &path
+) {
     tinyobj::attrib_t attrib;
 
     std::vector<tinyobj::shape_t> shapes;
-    std::vector<tinyobj::material_t> materials;
 
     std::string err;
 
-    bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &err, path.c_str());
+    std::string base_dir = path.parent_path();
+    base_dir += std::filesystem::path::preferred_separator;
+
+    bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &err, path.c_str(), base_dir.c_str());
 
     if (!err.empty()) {
         std::cerr << err << std::endl;
@@ -121,12 +126,33 @@ void load_model(std::vector<draw_object>& object_to_draw) {
     }
 
     // Append default material
-    materials.push_back({});
+    materials.emplace_back();
+
+    for (const auto &material : materials) {
+        std::string texture_filename = material.diffuse_texname;
+
+        if (texture_filename.empty() || textures.find(texture_filename) != textures.end()) {
+            continue;
+        }
+
+        if (!std::filesystem::exists(texture_filename)) {
+            texture_filename.insert(0, base_dir);
+            if (!std::filesystem::exists(texture_filename)) {
+                std::cerr << "Could not find texture: " << texture_filename << std::endl;
+                exit(1);
+            }
+        }
+
+        GLuint texture_id;
+        load_image(texture_filename, texture_id);
+
+        textures.emplace(material.diffuse_texname, texture_id);
+    }
 
     for (const auto &shape : shapes) {
-        auto& mesh = shape.mesh;
+        auto &mesh = shape.mesh;
 
-        // position: float3, normal: float3, texCoords: float2
+        // position: float3, normal: float3, ambient: float3, diffuse: float3, texCoords: float2
         std::vector<float> buffer;
 
         for (std::size_t f = 0; f < mesh.indices.size() / 3; ++f) {
@@ -136,13 +162,13 @@ void load_model(std::vector<draw_object>& object_to_draw) {
 
             float texture_coords[3][2];
             texture_coords[0][0] = attrib.texcoords[2 * idx0.texcoord_index];
-            texture_coords[0][1] = 1.0f - attrib.texcoords[2 * idx0.texcoord_index + 1];
+            texture_coords[0][1] = attrib.texcoords[2 * idx0.texcoord_index + 1];
 
             texture_coords[1][0] = attrib.texcoords[2 * idx1.texcoord_index];
-            texture_coords[1][1] = 1.0f - attrib.texcoords[2 * idx1.texcoord_index + 1];
+            texture_coords[1][1] = attrib.texcoords[2 * idx1.texcoord_index + 1];
 
             texture_coords[2][0] = attrib.texcoords[2 * idx2.texcoord_index];
-            texture_coords[2][1] = 1.0f - attrib.texcoords[2 * idx2.texcoord_index + 1];
+            texture_coords[2][1] = attrib.texcoords[2 * idx2.texcoord_index + 1];
 
             float v[3][3];
             for (std::size_t k = 0; k < 3; ++k) {
@@ -166,6 +192,10 @@ void load_model(std::vector<draw_object>& object_to_draw) {
                 n[2][k] = attrib.normals[3 * nf2 + k];
             }
 
+            int material_id = mesh.material_ids[f];
+            auto diffuse = materials[material_id].diffuse;
+            auto ambient =  materials[material_id].ambient;
+
             for (std::size_t k = 0; k < 3; ++k) {
                 buffer.push_back(v[k][0]);
                 buffer.push_back(v[k][1]);
@@ -175,12 +205,21 @@ void load_model(std::vector<draw_object>& object_to_draw) {
                 buffer.push_back(n[k][1]);
                 buffer.push_back(n[k][2]);
 
+                buffer.push_back(ambient[0]);
+                buffer.push_back(ambient[1]);
+                buffer.push_back(ambient[2]);
+
+                buffer.push_back(diffuse[0]);
+                buffer.push_back(diffuse[1]);
+                buffer.push_back(diffuse[2]);
+
                 buffer.push_back(texture_coords[k][0]);
                 buffer.push_back(texture_coords[k][1]);
             }
         }
 
         draw_object object{};
+        object.material_id = mesh.material_ids[0];
 
         glGenVertexArrays(1, &object.vao);
         glGenBuffers(1, &object.vbo);
@@ -190,7 +229,7 @@ void load_model(std::vector<draw_object>& object_to_draw) {
         glBindBuffer(GL_ARRAY_BUFFER, object.vbo);
         glBufferData(GL_ARRAY_BUFFER, buffer.size() * sizeof(float), buffer.data(), GL_STATIC_DRAW);
 
-        object.triangles_count = buffer.size() / (3 + 3 + 2) / 3;
+        object.triangles_count = buffer.size() / (3 + 3 + 3 + 3 + 2) / 3;
         std::vector<unsigned int> indices(object.triangles_count * 3);
         for (std::size_t i = 0; i < indices.size(); ++i) {
             indices[i] = i;
@@ -199,12 +238,17 @@ void load_model(std::vector<draw_object>& object_to_draw) {
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, object.ebo);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), indices.data(), GL_STATIC_DRAW);
 
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *) 0);
+        const GLsizei stride = (3 + 3 + 3 + 3 + 2) * sizeof(float);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void *) 0);
         glEnableVertexAttribArray(0);
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *) (3 * sizeof(float)));
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (void *) (3 * sizeof(float)));
         glEnableVertexAttribArray(1);
-        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *) (6 * sizeof(float)));
+        glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, stride, (void *) (6 * sizeof(float)));
         glEnableVertexAttribArray(2);
+        glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, stride, (void *) (9 * sizeof(float)));
+        glEnableVertexAttribArray(3);
+        glVertexAttribPointer(4, 2, GL_FLOAT, GL_FALSE, stride, (void *) (12 * sizeof(float)));
+        glEnableVertexAttribArray(4);
 
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         glBindVertexArray(0);
@@ -228,7 +272,7 @@ int main(int, char **) {
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);            // 3.0+ only
 
     // Create window with graphics context
-    GLFWwindow *window = glfwCreateWindow(1280, 720, "Dear ImGui - Conan", NULL, NULL);
+    GLFWwindow *window = glfwCreateWindow(720, 720, "Dear ImGui - Conan", NULL, NULL);
     if (window == NULL)
         return 1;
     glfwMakeContextCurrent(window);
@@ -240,11 +284,11 @@ int main(int, char **) {
         return 1;
     }
 
-    GLuint texture;
-    load_image(texture);
-
     std::vector<draw_object> objects_to_draw{};
-    load_model(objects_to_draw);
+    std::vector<tinyobj::material_t> materials{};
+    std::unordered_map<std::string, GLuint> textures{};
+
+    load_model(objects_to_draw, materials, textures, std::filesystem::path("assets/models/cube/cube.obj"));
 
     // init shader
     shader_t triangle_shader(
@@ -288,8 +332,12 @@ int main(int, char **) {
         ImGui::SliderFloat("rotation", &rotation, 0, 2 * glm::pi<float>());
         static float translation[] = {0.0, 0.0};
         ImGui::SliderFloat2("position", translation, -1.0, 1.0);
-        static float color[4] = {1.0f, 1.0f, 1.0f, 1.0f};
-        ImGui::ColorEdit3("color", color);
+
+        ImGui::Separator();
+
+        ImGui::Text("Ambient light");
+        static float ambient_color[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+        ImGui::ColorEdit3("color", ambient_color);
         ImGui::End();
 
         // Pass the parameters to the shader as uniforms
@@ -299,7 +347,12 @@ int main(int, char **) {
                 std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start_time).count() /
                 1000.0);
         triangle_shader.set_uniform("u_time", time_from_start);
-        triangle_shader.set_uniform("u_color", color[0], color[1], color[2]);
+        triangle_shader.set_uniform(
+                "u_ambient",
+                ambient_color[0],
+                ambient_color[1],
+                ambient_color[2]
+        );
 
 
         auto model = glm::rotate(glm::mat4(1), glm::radians(rotation * 60), glm::vec3(0, 1, 0)) *
@@ -315,12 +368,17 @@ int main(int, char **) {
 
         // Bind triangle shader
         triangle_shader.use();
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, texture);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
         for (const auto &object : objects_to_draw) {
+            glActiveTexture(GL_TEXTURE0);
+
+            std::string const &diffuse_texture = materials[object.material_id].diffuse_texname;
+            if (textures.find(diffuse_texture) != textures.end()) {
+                glBindTexture(GL_TEXTURE_2D, textures[diffuse_texture]);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            }
+
             glBindVertexArray(object.vao);
             glDrawElements(GL_TRIANGLES, 3 * object.triangles_count, GL_UNSIGNED_INT, 0);
         }

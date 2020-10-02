@@ -13,7 +13,7 @@ find_package(glm CONFIG)
 find_package(stb CONFIG)
 find_package(tinyobjloader CONFIG)
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 
 include_directories(includes)
 
