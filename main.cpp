@@ -40,37 +40,16 @@ static void glfw_error_callback(int error, const char *description) {
     std::cerr << fmt::format("Glfw Error {}: {}\n", error, description);
 }
 
-void create_triangle(GLuint &vbo, GLuint &vao, GLuint &ebo) {
-    // create the triangle
-    float triangle_vertices[] = {
-            -1, 1, 0,    // position vertex 1
-            0, 1, 0.0f,     // color vertex 1
+GLuint generate_default_texture() {
+    GLuint texture;
 
-            -1, -1, 0.0f,  // position vertex 1
-            0, 0, 0.0f,     // color vertex 1
+    unsigned char default_texture[3] = {255, 255, 255};
 
-            1, -1, 0.0f, // position vertex 1
-            1, 0, 0,     // color vertex 1
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 1, 1, 0, GL_RGB, GL_UNSIGNED_BYTE, default_texture);
 
-            1, 1, 0.0f, // position vertex 1
-            1, 1, 0,     // color vertex 1
-    };
-    unsigned int triangle_indices[] = {
-            0, 1, 2, 0, 3, 2};
-    glGenVertexArrays(1, &vao);
-    glGenBuffers(1, &vbo);
-    glGenBuffers(1, &ebo);
-    glBindVertexArray(vao);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(triangle_vertices), triangle_vertices, GL_STATIC_DRAW);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(triangle_indices), triangle_indices, GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *) 0);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *) (3 * sizeof(float)));
-    glEnableVertexAttribArray(1);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
+    return texture;
 }
 
 void load_image(std::string const &path, GLuint &texture) {
@@ -88,7 +67,7 @@ void load_image(std::string const &path, GLuint &texture) {
     stbi_image_free(image);
 }
 
-struct draw_object {
+struct drawable {
     GLuint vao;
     GLuint vbo;
     GLuint ebo;
@@ -101,7 +80,7 @@ struct draw_object {
 // Loads model from .obj file. Assumes that if the model uses some material defined in .mtl file, the material is stored
 // in exact same directory as the .obj file itself.
 void load_model(
-        std::vector<draw_object> &object_to_draw,
+        std::vector<drawable> &object_to_draw,
         std::vector<tinyobj::material_t> &materials,
         std::unordered_map<std::string, GLuint> &textures,
         std::filesystem::path const &path
@@ -218,7 +197,7 @@ void load_model(
             }
         }
 
-        draw_object object{};
+        drawable object{};
         object.material_id = mesh.material_ids[0];
 
         glGenVertexArrays(1, &object.vao);
@@ -284,9 +263,11 @@ int main(int, char **) {
         return 1;
     }
 
-    std::vector<draw_object> objects_to_draw{};
+    std::vector<drawable> objects_to_draw{};
     std::vector<tinyobj::material_t> materials{};
+
     std::unordered_map<std::string, GLuint> textures{};
+    GLuint default_texture = generate_default_texture();
 
     load_model(objects_to_draw, materials, textures, std::filesystem::path("assets/models/cube/cube.obj"));
 
@@ -377,6 +358,8 @@ int main(int, char **) {
                 glBindTexture(GL_TEXTURE_2D, textures[diffuse_texture]);
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            } else {
+                glBindTexture(GL_TEXTURE_2D, default_texture);
             }
 
             glBindVertexArray(object.vao);
