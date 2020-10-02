@@ -26,7 +26,7 @@ add_executable(opengl-imgui-sample
         bindings/imgui_impl_glfw.h
         bindings/imgui_impl_opengl3.h
         assets/shaders/simple-shader.vs
-        assets/shaders/simple-shader.fs)
+        assets/shaders/simple-shader.fs camera.cpp includes/camera.hpp)
 
 install(DIRECTORY ${PROJECT_SOURCE_DIR}/assets DESTINATION ${PROJECT_BINARY_DIR})
 

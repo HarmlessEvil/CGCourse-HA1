@@ -30,10 +30,13 @@
 
 // Math constant and routines for OpenGL interop
 #include <glm/gtc/constants.hpp>
+#include <glm/gtc/quaternion.hpp>
 #include <glm/gtx/transform.hpp>
+#include <glm/gtx/quaternion.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+#include "camera.hpp"
 #include "opengl_shader.h"
 
 static void glfw_error_callback(int error, const char *description) {
@@ -173,7 +176,7 @@ void load_model(
 
             int material_id = mesh.material_ids[f];
             auto diffuse = materials[material_id].diffuse;
-            auto ambient =  materials[material_id].ambient;
+            auto ambient = materials[material_id].ambient;
 
             for (std::size_t k = 0; k < 3; ++k) {
                 buffer.push_back(v[k][0]);
@@ -277,6 +280,23 @@ int main(int, char **) {
             "assets/shaders/simple-shader.fs"
     );
 
+    camera main_camera{};
+
+    auto drag_callback = [&main_camera]() {
+        auto const &delta = ImGui::GetMouseDragDelta();
+        main_camera.rotate(glm::vec2(glm::radians(-delta.y), glm::radians(-delta.x)));
+        ImGui::ResetMouseDragDelta();
+    };
+
+    auto scroll_callback = [&main_camera](ImGuiIO const &io, float mouse_delta) {
+        float delta = 1 + mouse_delta * 0.2f;
+        if (io.MouseWheel > 0) {
+            main_camera.zoom_in(delta);
+        } else {
+            main_camera.zoom_out(delta);
+        }
+    };
+
     // Setup GUI context
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -308,22 +328,13 @@ int main(int, char **) {
         ImGui::NewFrame();
 
         // GUI
-        ImGui::Begin("Triangle Position/Color");
-        static float rotation = 0.0;
-        ImGui::SliderFloat("rotation", &rotation, 0, 2 * glm::pi<float>());
-        static float translation[] = {0.0, 0.0};
-        ImGui::SliderFloat2("position", translation, -1.0, 1.0);
-
-        ImGui::Separator();
-
+        ImGui::Begin("Settings");
         ImGui::Text("Ambient light");
         static float ambient_color[4] = {1.0f, 1.0f, 1.0f, 1.0f};
         ImGui::ColorEdit3("color", ambient_color);
         ImGui::End();
 
         // Pass the parameters to the shader as uniforms
-        triangle_shader.set_uniform("u_rotation", rotation);
-        triangle_shader.set_uniform("u_translation", translation[0], translation[1]);
         float const time_from_start = (float) (
                 std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start_time).count() /
                 1000.0);
@@ -335,14 +346,21 @@ int main(int, char **) {
                 ambient_color[2]
         );
 
+        float mouse_delta = std::abs(io.MouseWheel);
+        if (!io.WantCaptureMouse && mouse_delta > 0.01f) {
+            scroll_callback(io, mouse_delta);
+        }
 
-        auto model = glm::rotate(glm::mat4(1), glm::radians(rotation * 60), glm::vec3(0, 1, 0)) *
-                     glm::scale(glm::vec3(2, 2, 2));
-        auto view = glm::lookAt<float>(glm::vec3(0, 0, -3), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+        if (!io.WantCaptureMouse && ImGui::IsMouseDragging()) {
+            drag_callback();
+        }
+
+        auto model = glm::mat4(1) * glm::scale(glm::vec3(2, 2, 2));
+        auto view = glm::lookAt<float>(main_camera.position(), main_camera.target(), main_camera.up());
+
         auto projection = glm::perspective<float>(90, float(display_w) / display_h, 0.1, 100);
         auto mvp = projection * view * model;
-        //glm::mat4 identity(1.0);
-        //mvp = identity;
+
         triangle_shader.set_uniform("u_mvp", glm::value_ptr(mvp));
         triangle_shader.set_uniform("u_tex", int(0));
 
