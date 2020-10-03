@@ -78,7 +78,8 @@ GLuint load_cubemap(std::vector<std::string> const &faces) {
                 width,
                 height,
                 0,
-                GL_RGB, GL_UNSIGNED_BYTE, data
+                GL_RGB, GL_UNSIGNED_BYTE,
+                data
         );
         stbi_image_free(data);
     }
@@ -410,6 +411,9 @@ int main(int, char **) {
 
     auto const start_time = std::chrono::steady_clock::now();
 
+    glEnable(GL_CULL_FACE);
+    glEnable(GL_DEPTH_TEST);
+
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
 
@@ -420,13 +424,10 @@ int main(int, char **) {
         // Set viewport to fill the whole window area
         glViewport(0, 0, display_w, display_h);
 
-        glEnable(GL_CULL_FACE);
-
         // Fill background with solid color
         glClearColor(0.30f, 0.55f, 0.60f, 1.00f);
         glClear(GL_COLOR_BUFFER_BIT);
 
-        glEnable(GL_DEPTH_TEST);
         glClearDepth(1);
         glClear(GL_DEPTH_BUFFER_BIT);
 
@@ -438,21 +439,19 @@ int main(int, char **) {
         // GUI
         ImGui::Begin("Settings");
         ImGui::Text("Ambient light");
-        static float ambient_color[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+        static float ambient_color[4] = {0.5f, 0.5f, 0.5f, 1.0f};
         ImGui::ColorEdit3("color", ambient_color);
-        ImGui::End();
 
-        // Pass the parameters to the shader as uniforms
-        float const time_from_start = (float) (
-                std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start_time).count() /
-                1000.0);
-        triangle_shader.set_uniform("u_time", time_from_start);
-        triangle_shader.set_uniform(
-                "u_ambient",
-                ambient_color[0],
-                ambient_color[1],
-                ambient_color[2]
-        );
+        ImGui::Separator();
+
+        ImGui::Text("Material");
+        static float reflectivity = 0.6f;
+        ImGui::SliderFloat("reflectivity", &reflectivity, 0.0f, 1.0f);
+        static float refraction_coefficient = 0.5f;
+        ImGui::SliderFloat("refraction coefficient", &refraction_coefficient, 0.0f, 1.0f);
+        static float refractive_index = 1.0f;
+        ImGui::SliderFloat("refractive index", &refractive_index, 0.5f, 5.0f);
+        ImGui::End();
 
         float mouse_delta = std::abs(io.MouseWheel);
         if (!io.WantCaptureMouse && mouse_delta > 0.01f) {
@@ -463,22 +462,37 @@ int main(int, char **) {
             drag_callback();
         }
 
-        auto model = glm::mat4(1) * glm::scale(glm::vec3(0.5, 0.5, 0.5));
+        auto const &camera_position = main_camera.position();
+        auto model = glm::mat4(1) * glm::scale(glm::vec3(0.05, 0.05, 0.05));
         auto skybox_view = glm::lookAt<float>(main_camera.position_unscaled(), main_camera.target(), main_camera.up());
-        auto view = glm::lookAt<float>(main_camera.position(), main_camera.target(), main_camera.up());
+        auto view = glm::lookAt<float>(camera_position, main_camera.target(), main_camera.up());
 
-        auto projection = glm::perspective<float>(90, float(display_w) / display_h, 0.1, 100);
-        auto mvp = projection * view * model;
-
-        skybox_shader.set_uniform("u_projection", glm::value_ptr(projection));
-        skybox_shader.set_uniform("u_view", glm::value_ptr(skybox_view));
-        skybox_shader.set_uniform("u_skybox", int(0));
-
-        triangle_shader.set_uniform("u_mvp", glm::value_ptr(mvp));
-        triangle_shader.set_uniform("u_tex", int(0));
+        auto projection = glm::perspective<float>(90, float(display_w) / display_h, 0.01, 100);
 
         // Bind triangle shader
         triangle_shader.use();
+
+        triangle_shader.set_uniform(
+                "u_ambient",
+                ambient_color[0],
+                ambient_color[1],
+                ambient_color[2]
+        );
+
+        triangle_shader.set_uniform("u_camera_pos", camera_position.x, camera_position.y, camera_position.z);
+        triangle_shader.set_uniform("u_model", glm::value_ptr(model));
+        triangle_shader.set_uniform("u_view", glm::value_ptr(view));
+        triangle_shader.set_uniform("u_projection", glm::value_ptr(projection));
+
+        triangle_shader.set_uniform("u_tex", int(0));
+        triangle_shader.set_uniform("u_skybox", int(1));
+
+        triangle_shader.set_uniform("u_reflectivity", reflectivity);
+        triangle_shader.set_uniform("u_refraction_coefficient", refraction_coefficient);
+        triangle_shader.set_uniform("u_refractive_index", refractive_index);
+
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, cubemap_texture);
 
         for (const auto &object : objects_to_draw) {
             glActiveTexture(GL_TEXTURE0);
@@ -500,10 +514,11 @@ int main(int, char **) {
         glDepthFunc(GL_LEQUAL);
         skybox_shader.use();
 
-        glBindVertexArray(skybox.vao);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, cubemap_texture);
+        skybox_shader.set_uniform("u_projection", glm::value_ptr(projection));
+        skybox_shader.set_uniform("u_view", glm::value_ptr(skybox_view));
+        skybox_shader.set_uniform("u_skybox", int(1));
 
+        glBindVertexArray(skybox.vao);
         glDrawElements(GL_TRIANGLES, 3 * skybox.triangles_count, GL_UNSIGNED_INT, 0);
 
         glDepthFunc(GL_LESS);

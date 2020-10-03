@@ -29,7 +29,7 @@ public:
 
 private:
     float _zoom = 1.0f;
-    std::pair<float, float> _zoom_constraints{0.5f, 100.0f};
+    std::pair<float, float> _zoom_constraints{0.01f, 100.0f};
 
     glm::vec2 _current_rotation{0.0f, 0.0f};
     std::pair<glm::vec2, glm::vec2> _rotation_constraints{
