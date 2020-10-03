@@ -464,8 +464,8 @@ int main(int, char **) {
 
         auto const &camera_position = main_camera.position();
         auto model = glm::mat4(1) * glm::scale(glm::vec3(0.05, 0.05, 0.05));
-        auto skybox_view = glm::lookAt<float>(main_camera.position_unscaled(), main_camera.target(), main_camera.up());
         auto view = glm::lookAt<float>(camera_position, main_camera.target(), main_camera.up());
+        auto skybox_view = glm::mat4(glm::mat3(view));
 
         auto projection = glm::perspective<float>(90, float(display_w) / display_h, 0.01, 100);
 
