@@ -55,6 +55,43 @@ GLuint generate_default_texture() {
     return texture;
 }
 
+GLuint load_cubemap(std::vector<std::string> const &faces) {
+    GLuint texture;
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, texture);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, texture);
+
+    for (std::size_t i = 0; i < faces.size(); ++i) {
+        int width, height, channels;
+        unsigned char *data = stbi_load(faces[i].c_str(), &width, &height, &channels, STBI_rgb);
+
+        if (!data) {
+            std::cerr << "Failed to load cubemap: " << faces[i] << std::endl;
+            stbi_image_free(data);
+            exit(1);
+        }
+
+        glTexImage2D(
+                GL_TEXTURE_CUBE_MAP_POSITIVE_X + i,
+                0,
+                GL_RGB,
+                width,
+                height,
+                0,
+                GL_RGB, GL_UNSIGNED_BYTE, data
+        );
+        stbi_image_free(data);
+    }
+
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+    return texture;
+}
+
 void load_image(std::string const &path, GLuint &texture) {
     int width, height, channels;
 
@@ -70,6 +107,14 @@ void load_image(std::string const &path, GLuint &texture) {
     stbi_image_free(image);
 }
 
+struct skybox {
+    GLuint vao;
+    GLuint vbo;
+    GLuint ebo;
+
+    std::size_t triangles_count;
+};
+
 struct drawable {
     GLuint vao;
     GLuint vbo;
@@ -80,10 +125,54 @@ struct drawable {
     std::size_t triangles_count;
 };
 
+skybox load_skybox() {
+    float vertices[] = {
+            1.0f, 1.0f, 1.0f,
+            1.0f, 1.0f, -1.0f,
+            1.0f, -1.0f, 1.0f,
+            1.0f, -1.0f, -1.0f,
+            -1.0f, 1.0f, 1.0f,
+            -1.0f, 1.0f, -1.0f,
+            -1.0f, -1.0f, 1.0f,
+            -1.0f, -1.0f, -1.0f,
+    };
+    unsigned int indices[] = {
+            5, 7, 3, 3, 1, 5,
+            5, 4, 7, 7, 4, 6,
+            6, 2, 7, 7, 2, 3,
+            1, 3, 0, 0, 3, 2,
+            0, 2, 4, 2, 6, 4,
+            0, 5, 1, 0, 4, 5
+    };
+
+    skybox skybox{};
+
+    glGenVertexArrays(1, &skybox.vao);
+    glGenBuffers(1, &skybox.vbo);
+    glGenBuffers(1, &skybox.ebo);
+    glBindVertexArray(skybox.vao);
+
+    glBindBuffer(GL_ARRAY_BUFFER, skybox.vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+    skybox.triangles_count = sizeof(indices) / sizeof(unsigned int) / 3;
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, skybox.ebo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *) 0);
+    glEnableVertexAttribArray(0);
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+
+    return skybox;
+}
+
 // Loads model from .obj file. Assumes that if the model uses some material defined in .mtl file, the material is stored
 // in exact same directory as the .obj file itself.
 void load_model(
-        std::vector<drawable> &object_to_draw,
+        std::vector<drawable> &objects_to_draw,
         std::vector<tinyobj::material_t> &materials,
         std::unordered_map<std::string, GLuint> &textures,
         std::filesystem::path const &path
@@ -235,7 +324,7 @@ void load_model(
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         glBindVertexArray(0);
 
-        object_to_draw.push_back(object);
+        objects_to_draw.push_back(object);
     }
 }
 
@@ -266,18 +355,32 @@ int main(int, char **) {
         return 1;
     }
 
+    GLuint cubemap_texture = load_cubemap({
+                                                  "assets/textures/skybox/right.jpg",
+                                                  "assets/textures/skybox/left.jpg",
+                                                  "assets/textures/skybox/top.jpg",
+                                                  "assets/textures/skybox/bottom.jpg",
+                                                  "assets/textures/skybox/front.jpg",
+                                                  "assets/textures/skybox/back.jpg"
+                                          });
+    skybox skybox = load_skybox();
+
     std::vector<drawable> objects_to_draw{};
     std::vector<tinyobj::material_t> materials{};
 
     std::unordered_map<std::string, GLuint> textures{};
     GLuint default_texture = generate_default_texture();
 
-    load_model(objects_to_draw, materials, textures, std::filesystem::path("assets/models/cube/cube.obj"));
+    load_model(objects_to_draw, materials, textures, std::filesystem::path("assets/models/backpack/backpack.obj"));
 
     // init shader
     shader_t triangle_shader(
             "assets/shaders/simple-shader.vs",
             "assets/shaders/simple-shader.fs"
+    );
+    shader_t skybox_shader(
+            "assets/shaders/skybox.vertex.shader",
+            "assets/shaders/skybox.fragment.shader"
     );
 
     camera main_camera{};
@@ -317,10 +420,15 @@ int main(int, char **) {
         // Set viewport to fill the whole window area
         glViewport(0, 0, display_w, display_h);
 
+        glEnable(GL_CULL_FACE);
+
         // Fill background with solid color
         glClearColor(0.30f, 0.55f, 0.60f, 1.00f);
         glClear(GL_COLOR_BUFFER_BIT);
-        glEnable(GL_CULL_FACE);
+
+        glEnable(GL_DEPTH_TEST);
+        glClearDepth(1);
+        glClear(GL_DEPTH_BUFFER_BIT);
 
         // Gui start new frame
         ImGui_ImplOpenGL3_NewFrame();
@@ -355,15 +463,19 @@ int main(int, char **) {
             drag_callback();
         }
 
-        auto model = glm::mat4(1) * glm::scale(glm::vec3(2, 2, 2));
+        auto model = glm::mat4(1) * glm::scale(glm::vec3(0.5, 0.5, 0.5));
+        auto skybox_view = glm::lookAt<float>(main_camera.position_unscaled(), main_camera.target(), main_camera.up());
         auto view = glm::lookAt<float>(main_camera.position(), main_camera.target(), main_camera.up());
 
         auto projection = glm::perspective<float>(90, float(display_w) / display_h, 0.1, 100);
         auto mvp = projection * view * model;
 
+        skybox_shader.set_uniform("u_projection", glm::value_ptr(projection));
+        skybox_shader.set_uniform("u_view", glm::value_ptr(skybox_view));
+        skybox_shader.set_uniform("u_skybox", int(0));
+
         triangle_shader.set_uniform("u_mvp", glm::value_ptr(mvp));
         triangle_shader.set_uniform("u_tex", int(0));
-
 
         // Bind triangle shader
         triangle_shader.use();
@@ -383,7 +495,18 @@ int main(int, char **) {
             glBindVertexArray(object.vao);
             glDrawElements(GL_TRIANGLES, 3 * object.triangles_count, GL_UNSIGNED_INT, 0);
         }
-        glBindTexture(GL_TEXTURE_2D, 0);
+        glBindVertexArray(0);
+
+        glDepthFunc(GL_LEQUAL);
+        skybox_shader.use();
+
+        glBindVertexArray(skybox.vao);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, cubemap_texture);
+
+        glDrawElements(GL_TRIANGLES, 3 * skybox.triangles_count, GL_UNSIGNED_INT, 0);
+
+        glDepthFunc(GL_LESS);
         glBindVertexArray(0);
 
         // Generate gui render commands
@@ -400,6 +523,16 @@ int main(int, char **) {
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
+
+    glDeleteVertexArrays(1, &skybox.vao);
+    glDeleteBuffers(1, &skybox.vbo);
+    glDeleteBuffers(1, &skybox.ebo);
+
+    for (const auto &item : objects_to_draw) {
+        glDeleteVertexArrays(1, &item.vao);
+        glDeleteBuffers(1, &item.vbo);
+        glDeleteBuffers(1, &item.ebo);
+    }
 
     glfwDestroyWindow(window);
     glfwTerminate();

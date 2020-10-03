@@ -17,6 +17,8 @@ public:
 
     [[nodiscard]] glm::vec3 position() const;
 
+    [[nodiscard]] glm::vec3 position_unscaled() const;
+
     [[nodiscard]] const glm::vec3 &target() const;
 
     void rotate(glm::vec2 const &rotation);
@@ -26,8 +28,8 @@ public:
     void zoom_out(float delta);
 
 private:
-    float _zoom = 3.0f;
-    std::pair<float, float> _zoom_constraints{1.0f, 50.0f};
+    float _zoom = 1.0f;
+    std::pair<float, float> _zoom_constraints{0.5f, 100.0f};
 
     glm::vec2 _current_rotation{0.0f, 0.0f};
     std::pair<glm::vec2, glm::vec2> _rotation_constraints{
@@ -37,6 +39,8 @@ private:
 
     const glm::vec3 _target{0.0f, 0.0f, 0.0f};
     const glm::vec3 _up{0.0f, 1.0f, 0.0f};
+
+    [[nodiscard]] glm::vec3 position(glm::vec4 const &base_position) const;
 };
 
 
