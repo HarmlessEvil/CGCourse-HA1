@@ -372,7 +372,7 @@ int main(int, char **) {
     std::unordered_map<std::string, GLuint> textures{};
     GLuint default_texture = generate_default_texture();
 
-    load_model(objects_to_draw, materials, textures, std::filesystem::path("assets/models/backpack/backpack.obj"));
+    load_model(objects_to_draw, materials, textures, std::filesystem::path("assets/models/sphere/sphere.obj"));
 
     // init shader
     shader_t triangle_shader(
@@ -447,6 +447,10 @@ int main(int, char **) {
         ImGui::Text("Material");
         static float reflectivity = 0.6f;
         ImGui::SliderFloat("reflectivity", &reflectivity, 0.0f, 1.0f);
+        static bool enable_fresnel = true;
+        ImGui::Checkbox("enable Fresnel", &enable_fresnel);
+        static float shlick_coefficient = 5.0f;
+        ImGui::SliderFloat("Shlick coefficient", &shlick_coefficient, 0.0f, 10.0f);
         static float refraction_coefficient = 0.5f;
         ImGui::SliderFloat("refraction coefficient", &refraction_coefficient, 0.0f, 1.0f);
         static float refractive_index = 1.0f;
@@ -487,7 +491,9 @@ int main(int, char **) {
         triangle_shader.set_uniform("u_tex", int(0));
         triangle_shader.set_uniform("u_skybox", int(1));
 
+        triangle_shader.set_uniform("u_enable_fresnel", enable_fresnel);
         triangle_shader.set_uniform("u_reflectivity", reflectivity);
+        triangle_shader.set_uniform("u_shlick_coefficient", shlick_coefficient);
         triangle_shader.set_uniform("u_refraction_coefficient", refraction_coefficient);
         triangle_shader.set_uniform("u_refractive_index", refractive_index);
 

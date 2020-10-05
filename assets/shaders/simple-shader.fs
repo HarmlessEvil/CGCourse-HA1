@@ -16,8 +16,11 @@ in vx_output_t v_out;
 uniform vec3 u_camera_pos;
 uniform vec3 u_ambient;
 
+uniform bool u_enable_fresnel;
+
 uniform float u_reflectivity;
 uniform float u_refractive_index;
+uniform float u_shlick_coefficient;
 uniform float u_refraction_coefficient;
 
 uniform sampler2D u_tex;
@@ -28,12 +31,16 @@ void main()
     vec3 unit_normal = normalize(v_out.normal);
 
     vec3 I = normalize(v_out.position - u_camera_pos);
+    float cos_theta = dot(-I, unit_normal);
+
+    float fresnel_coefficient = pow((1 - cos_theta), u_shlick_coefficient) * (1 - u_reflectivity) + u_reflectivity;
+
     vec3 R = reflect(I, unit_normal);
     vec3 reflection = texture(u_skybox, R).rgb;
 
     vec3 refraction_vector = refract(I, unit_normal, 1.0/u_refractive_index);
     vec3 refraction = texture(u_skybox, refraction_vector).rgb;
-    vec3 environment = mix(reflection, refraction, u_refraction_coefficient);
+    vec3 environment = mix(reflection, refraction, u_enable_fresnel ? fresnel_coefficient : u_refraction_coefficient);
 
     vec3 texture_color = texture(u_tex, v_out.texture_coord).rgb;
     vec3 color = texture_color * (u_ambient * v_out.ambient + v_out.diffuse);
