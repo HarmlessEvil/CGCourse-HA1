@@ -372,7 +372,7 @@ int main(int, char **) {
     std::unordered_map<std::string, GLuint> textures{};
     GLuint default_texture = generate_default_texture();
 
-    load_model(objects_to_draw, materials, textures, std::filesystem::path("assets/models/sphere/sphere.obj"));
+    load_model(objects_to_draw, materials, textures, std::filesystem::path("assets/models/penguin/penguin.obj"));
 
     // init shader
     shader_t triangle_shader(
