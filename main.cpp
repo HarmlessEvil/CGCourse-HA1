@@ -184,10 +184,17 @@ void load_model(
 
     std::string err;
 
-    std::string base_dir = path.parent_path();
+    std::string base_dir = path.parent_path().generic_string();
     base_dir += std::filesystem::path::preferred_separator;
 
-    bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &err, path.c_str(), base_dir.c_str());
+    bool ret = tinyobj::LoadObj(
+            &attrib,
+            &shapes,
+            &materials,
+            &err,
+            path.generic_string().c_str(),
+            base_dir.c_str()
+    );
 
     if (!err.empty()) {
         std::cerr << err << std::endl;
