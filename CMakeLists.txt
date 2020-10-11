@@ -16,31 +16,20 @@ find_package(spdlog CONFIG)
 
 set(_src_root_path "${PROJECT_SOURCE_DIR}")
 
-add_executable( opengl-imgui-sample
-  main.cpp
-  obj_model.cpp
-  obj_model.h
-  opengl_shader.cpp
-  opengl_shader.h
-  bindings/imgui_impl_glfw.cpp
-  bindings/imgui_impl_opengl3.cpp
-  bindings/imgui_impl_glfw.h
-  bindings/imgui_impl_opengl3.h
-  assets/simple-shader.vs
-  assets/simple-shader.fs
-  assets/model.vs
-  assets/model.fs
-  )
+add_executable(opengl-imgui-sample
+        main.cpp
+        obj_model.cpp
+        obj_model.h
+        opengl_shader.cpp
+        opengl_shader.h
+        bindings/imgui_impl_glfw.cpp
+        bindings/imgui_impl_opengl3.cpp
+        bindings/imgui_impl_glfw.h
+        bindings/imgui_impl_opengl3.h
+        image.cpp
+        terrain.cpp)
 
-add_custom_command(TARGET opengl-imgui-sample
-    POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_SOURCE_DIR}/assets/simple-shader.vs ${PROJECT_BINARY_DIR}
-    COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_SOURCE_DIR}/assets/simple-shader.fs ${PROJECT_BINARY_DIR}
-    COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_SOURCE_DIR}/assets/model.vs ${PROJECT_BINARY_DIR}
-    COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_SOURCE_DIR}/assets/model.fs ${PROJECT_BINARY_DIR}
-    COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_SOURCE_DIR}/assets/bunny.obj ${PROJECT_BINARY_DIR}
-    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:opengl-imgui-sample> ${PROJECT_BINARY_DIR}
-    )
+install(DIRECTORY ${PROJECT_SOURCE_DIR}/assets DESTINATION ${PROJECT_BINARY_DIR})
 
 set_target_properties(opengl-imgui-sample PROPERTIES LINKER_LANGUAGE CXX)
 set_property(TARGET opengl-imgui-sample PROPERTY CXX_STANDARD 17)

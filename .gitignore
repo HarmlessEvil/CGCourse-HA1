@@ -1,5 +1,6 @@
 bindings
 build
+build-debug
 *.exe
 *.dll
 imgui.ini

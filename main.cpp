@@ -19,6 +19,8 @@
 
 // STB, load images
 #define STB_IMAGE_IMPLEMENTATION
+#define STBI_FAILURE_USERMSG
+
 #include <stb_image.h>
 
 
@@ -31,262 +33,307 @@
 
 #include "opengl_shader.h"
 
+#include "image.hpp"
 #include "obj_model.h"
+#include "terrain.hpp"
 
-static void glfw_error_callback(int error, const char *description)
-{
-   throw std::runtime_error(fmt::format("Glfw Error {}: {}\n", error, description));
+image load_image(std::string const &path, bool flip_vertically = true, int desired_channels = 0) {
+    int width, height, channels;
+
+    stbi_set_flip_vertically_on_load(flip_vertically);
+    unsigned char *data = stbi_load(path.c_str(), &width, &height, &channels, desired_channels);
+
+    if (desired_channels == 0) {
+        channels = desired_channels;
+    }
+
+    if (!data) {
+        std::cout << stbi_failure_reason() << std::endl;
+        exit(1);
+    }
+
+    return image{width, height, channels, data, stbi_image_free};
 }
 
-void create_quad(GLuint &vbo, GLuint &vao, GLuint &ebo)
-{
-   // create the triangle
-   const float vertices[] = {
-       -1, 1,
-       0, 1,
+GLuint load_texture(image const &image, GLenum format) {
+    GLuint texture;
 
-       -1, -1,
-       0, 0,
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glTexImage2D(
+            GL_TEXTURE_2D,
+            0,
+            format,
+            image.width(),
+            image.height(),
+            0,
+            format,
+            GL_UNSIGNED_BYTE,
+            image.data()
+    );
+    glGenerateMipmap(GL_TEXTURE_2D);
 
-       1, -1,
-       1, 0,
-
-       1, 1,
-       1, 1,
-   };
-   const unsigned int indices[] = { 0, 1, 2, 0, 2, 3 };
-
-   glGenVertexArrays(1, &vao);
-   glGenBuffers(1, &vbo);
-   glGenBuffers(1, &ebo);
-   glBindVertexArray(vao);
-   glBindBuffer(GL_ARRAY_BUFFER, vbo);
-   glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-   glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
-   glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void *)0);
-   glEnableVertexAttribArray(0);
-   glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void *)(2 * sizeof(float)));
-   glEnableVertexAttribArray(1);
-   glBindBuffer(GL_ARRAY_BUFFER, 0);
-   glBindVertexArray(0);
+    return texture;
 }
 
-struct render_target_t
-{
-   render_target_t(int res_x, int res_y);
-   ~render_target_t();
+static void glfw_error_callback(int error, const char *description) {
+    throw std::runtime_error(fmt::format("Glfw Error {}: {}\n", error, description));
+}
 
-   GLuint fbo_;
-   GLuint color_, depth_;
-   int width_, height_;
+void create_quad(GLuint &vbo, GLuint &vao, GLuint &ebo) {
+    // create the triangle
+    const float vertices[] = {
+            -1, 1,
+            0, 1,
+
+            -1, -1,
+            0, 0,
+
+            1, -1,
+            1, 0,
+
+            1, 1,
+            1, 1,
+    };
+    const unsigned int indices[] = {0, 1, 2, 0, 2, 3};
+
+    glGenVertexArrays(1, &vao);
+    glGenBuffers(1, &vbo);
+    glGenBuffers(1, &ebo);
+    glBindVertexArray(vao);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void *) 0);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void *) (2 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+}
+
+struct render_target_t {
+    render_target_t(int res_x, int res_y);
+
+    ~render_target_t();
+
+    GLuint fbo_;
+    GLuint color_, depth_;
+    int width_, height_;
 };
 
-render_target_t::render_target_t(int res_x, int res_y)
-{
-   width_ = res_x;
-   height_ = res_y;
+render_target_t::render_target_t(int res_x, int res_y) {
+    width_ = res_x;
+    height_ = res_y;
 
-   glGenTextures(1, &color_);
-   glBindTexture(GL_TEXTURE_2D, color_);
-   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, res_x, res_y, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
+    glGenTextures(1, &color_);
+    glBindTexture(GL_TEXTURE_2D, color_);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, res_x, res_y, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
 
-   glGenTextures(1, &depth_);
-   glBindTexture(GL_TEXTURE_2D, depth_);
-   glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, res_x, res_y, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE, nullptr);
+    glGenTextures(1, &depth_);
+    glBindTexture(GL_TEXTURE_2D, depth_);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, res_x, res_y, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE,
+                 nullptr);
 
-   glBindTexture(GL_TEXTURE_2D, 0);
+    glBindTexture(GL_TEXTURE_2D, 0);
 
-   glGenFramebuffers(1, &fbo_);
+    glGenFramebuffers(1, &fbo_);
 
-   glBindFramebuffer(GL_FRAMEBUFFER, fbo_);
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo_);
 
-   glFramebufferTexture2D(GL_FRAMEBUFFER,
-      GL_COLOR_ATTACHMENT0,
-      GL_TEXTURE_2D,
-      color_,
-      0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER,
+                           GL_COLOR_ATTACHMENT0,
+                           GL_TEXTURE_2D,
+                           color_,
+                           0);
 
-   glFramebufferTexture2D(GL_FRAMEBUFFER,
-      GL_DEPTH_ATTACHMENT,
-      GL_TEXTURE_2D,
-      depth_,
-      0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER,
+                           GL_DEPTH_ATTACHMENT,
+                           GL_TEXTURE_2D,
+                           depth_,
+                           0);
 
-   GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-   if (status != GL_FRAMEBUFFER_COMPLETE)
-      throw std::runtime_error("Framebuffer incomplete");
+    GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+    if (status != GL_FRAMEBUFFER_COMPLETE)
+        throw std::runtime_error("Framebuffer incomplete");
 
-   glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 }
 
-render_target_t::~render_target_t()
-{
-   glDeleteFramebuffers(1, &fbo_);
-   glDeleteTextures(1, &depth_);
-   glDeleteTextures(1, &color_);
+render_target_t::~render_target_t() {
+    glDeleteFramebuffers(1, &fbo_);
+    glDeleteTextures(1, &depth_);
+    glDeleteTextures(1, &color_);
 }
 
 
-int main(int, char **)
-{
-   try
-   {
-      // Use GLFW to create a simple window
-      glfwSetErrorCallback(glfw_error_callback);
-      if (!glfwInit())
-         throw std::runtime_error("glfwInit error");
+int main(int, char **) {
+    image height_map = load_image("assets/textures/height_map.png");
+    terrain terrain{height_map};
 
-      // GL 3.3 + GLSL 330
-      const char *glsl_version = "#version 330";
-      glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-      glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-      glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-      //glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);            // 3.0+ only
+    try {
+        // Use GLFW to create a simple window
+        glfwSetErrorCallback(glfw_error_callback);
+        if (!glfwInit())
+            throw std::runtime_error("glfwInit error");
 
-      // Create window with graphics context
-      GLFWwindow *window = glfwCreateWindow(1280, 720, "Dear ImGui - Conan", NULL, NULL);
-      if (window == NULL)
-         throw std::runtime_error("Can't create glfw window");
+        // GL 3.3 + GLSL 330
+        const char *glsl_version = "#version 330";
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+        glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+        glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);            // 3.0+ only
 
-      glfwMakeContextCurrent(window);
-      glfwSwapInterval(1); // Enable vsync
+        // Create window with graphics context
+        GLFWwindow *window = glfwCreateWindow(1280, 720, "Dear ImGui - Conan", NULL, NULL);
+        if (window == NULL)
+            throw std::runtime_error("Can't create glfw window");
 
-      if (glewInit() != GLEW_OK)
-         throw std::runtime_error("Failed to initialize glew");
+        glfwMakeContextCurrent(window);
+        glfwSwapInterval(1); // Enable vsync
 
-      glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+        if (glewInit() != GLEW_OK)
+            throw std::runtime_error("Failed to initialize glew");
 
-      auto bunny = create_model("bunny.obj");
-      render_target_t rt(512, 512);
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
-      GLuint vbo, vao, ebo;
-      create_quad(vbo, vao, ebo);
+        auto bunny = create_model("assets/models/bunny.obj");
+        render_target_t rt(512, 512);
 
-      // init shader
-      shader_t quad_shader("simple-shader.vs", "simple-shader.fs");
-      shader_t bunny_shader("model.vs", "model.fs");
+        GLuint vbo, vao, ebo;
+        create_quad(vbo, vao, ebo);
 
-      // Setup GUI context
-      IMGUI_CHECKVERSION();
-      ImGui::CreateContext();
-      ImGuiIO &io = ImGui::GetIO();
-      ImGui_ImplGlfw_InitForOpenGL(window, true);
-      ImGui_ImplOpenGL3_Init(glsl_version);
-      ImGui::StyleColorsDark();
+        // init shader
+        shader_t quad_shader(
+                "assets/shaders/simple-shader.vs",
+                "assets/shaders/simple-shader.fs"
+        );
+        shader_t bunny_shader("assets/shaders/model.vs", "assets/shaders/model.fs");
 
-      auto const start_time = std::chrono::steady_clock::now();
+        // Setup GUI context
+        IMGUI_CHECKVERSION();
+        ImGui::CreateContext();
+        ImGuiIO &io = ImGui::GetIO();
+        ImGui_ImplGlfw_InitForOpenGL(window, true);
+        ImGui_ImplOpenGL3_Init(glsl_version);
+        ImGui::StyleColorsDark();
 
-      while (!glfwWindowShouldClose(window))
-      {
-         glfwPollEvents();
+        auto const start_time = std::chrono::steady_clock::now();
 
-         // Get windows size
-         int display_w, display_h;
-         glfwGetFramebufferSize(window, &display_w, &display_h);
+        while (!glfwWindowShouldClose(window)) {
+            glfwPollEvents();
 
-
-         // Gui start new frame
-         ImGui_ImplOpenGL3_NewFrame();
-         ImGui_ImplGlfw_NewFrame();
-         ImGui::NewFrame();
-
-         // GUI
-         //ImGui::Begin("Triangle Position/Color");
-         //static float rotation = 0.0;
-         //ImGui::SliderFloat("rotation", &rotation, 0, 2 * glm::pi<float>());
-         //static float translation[] = { 0.0, 0.0 };
-         //ImGui::SliderFloat2("position", translation, -1.0, 1.0);
-         //static float color[4] = { 1.0f,1.0f,1.0f,1.0f };
-         //ImGui::ColorEdit3("color", color);
-         //ImGui::End();
-
-         float const time_from_start = (float)(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start_time).count() / 1000.0);
+            // Get windows size
+            int display_w, display_h;
+            glfwGetFramebufferSize(window, &display_w, &display_h);
 
 
-         // Render offscreen
-         {
-            auto model = glm::rotate(glm::mat4(1), glm::radians(time_from_start * 10), glm::vec3(0, 1, 0)) * glm::scale(glm::vec3(7, 7, 7));
-            auto view = glm::lookAt<float>(glm::vec3(0, 1, 1), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
-            auto projection = glm::perspective<float>(90, float(rt.width_) / rt.height_, 0.1, 100);
-            auto mvp = projection * view * model;
+            // Gui start new frame
+            ImGui_ImplOpenGL3_NewFrame();
+            ImGui_ImplGlfw_NewFrame();
+            ImGui::NewFrame();
+
+            // GUI
+            //ImGui::Begin("Triangle Position/Color");
+            //static float rotation = 0.0;
+            //ImGui::SliderFloat("rotation", &rotation, 0, 2 * glm::pi<float>());
+            //static float translation[] = { 0.0, 0.0 };
+            //ImGui::SliderFloat2("position", translation, -1.0, 1.0);
+            //static float color[4] = { 1.0f,1.0f,1.0f,1.0f };
+            //ImGui::ColorEdit3("color", color);
+            //ImGui::End();
+
+            float const time_from_start = (float) (
+                    std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start_time).count() /
+                    1000.0);
 
 
-            glBindFramebuffer(GL_FRAMEBUFFER, rt.fbo_);
-            glViewport(0, 0, rt.width_, rt.height_);
-            glEnable(GL_DEPTH_TEST);
-            glColorMask(1, 1, 1, 1);
-            glDepthMask(1);
-            glDepthFunc(GL_LEQUAL);
+            // Render offscreen
+            {
+                auto model = glm::rotate(glm::mat4(1), glm::radians(time_from_start * 10), glm::vec3(0, 1, 0)) *
+                             glm::scale(glm::vec3(7, 7, 7));
+                auto view = glm::lookAt<float>(glm::vec3(0, 1, 1), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+                auto projection = glm::perspective<float>(90, float(rt.width_) / rt.height_, 0.1, 100);
+                auto mvp = projection * view * model;
 
-            glClearColor(0.3, 0.3, 0.3, 1);
-            glClearDepth(1);
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-            bunny_shader.use();
-            bunny_shader.set_uniform("u_mvp", glm::value_ptr(mvp));
-            bunny_shader.set_uniform("u_model", glm::value_ptr(model));
+                glBindFramebuffer(GL_FRAMEBUFFER, rt.fbo_);
+                glViewport(0, 0, rt.width_, rt.height_);
+                glEnable(GL_DEPTH_TEST);
+                glColorMask(1, 1, 1, 1);
+                glDepthMask(1);
+                glDepthFunc(GL_LEQUAL);
 
-            glm::vec3 light_dir = glm::rotateY(glm::vec3(1, 0, 0), glm::radians(time_from_start * 60));
+                glClearColor(0.3, 0.3, 0.3, 1);
+                glClearDepth(1);
+                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-            bunny_shader.set_uniform<float>("u_color", 0.83, 0.64, 0.31);
-            bunny_shader.set_uniform<float>("u_light", light_dir.x, light_dir.y, light_dir.z);
-            bunny->draw();
+                bunny_shader.use();
+                bunny_shader.set_uniform("u_mvp", glm::value_ptr(mvp));
+                bunny_shader.set_uniform("u_model", glm::value_ptr(model));
 
-            glDisable(GL_DEPTH_TEST);
-            glBindFramebuffer(GL_FRAMEBUFFER, 0);
-         }
+                glm::vec3 light_dir = glm::rotateY(glm::vec3(1, 0, 0), glm::radians(time_from_start * 60));
 
-         // Render main
-         {
-            auto model = glm::rotate<float>(glm::mat4(1), 0.1 * (-1 + 2 * cos(time_from_start) * cos(time_from_start)), glm::vec3(0, 1, 0));// *glm::scale(glm::vec3(7, 7, 7));
-            auto view = glm::lookAt<float>(glm::vec3(0, 0, -1), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
-            auto projection = glm::perspective<float>(90, float(display_w) / display_h, 0.1, 100);
-            auto mvp = projection * view * model;
+                bunny_shader.set_uniform<float>("u_color", 0.83, 0.64, 0.31);
+                bunny_shader.set_uniform<float>("u_light", light_dir.x, light_dir.y, light_dir.z);
+                bunny->draw();
 
-            glViewport(0, 0, display_w, display_h);
+                glDisable(GL_DEPTH_TEST);
+                glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            }
 
-            glClearColor(0.30f, 0.55f, 0.60f, 1.00f);
-            glClear(GL_COLOR_BUFFER_BIT);
+            // Render main
+            {
+                auto model = glm::rotate<float>(glm::mat4(1),
+                                                0.1 * (-1 + 2 * cos(time_from_start) * cos(time_from_start)),
+                                                glm::vec3(0, 1, 0));// *glm::scale(glm::vec3(7, 7, 7));
+                auto view = glm::lookAt<float>(glm::vec3(0, 0, -1), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+                auto projection = glm::perspective<float>(90, float(display_w) / display_h, 0.1, 100);
+                auto mvp = projection * view * model;
 
-            quad_shader.use();
-            quad_shader.set_uniform("u_mvp", glm::value_ptr(mvp));
-            quad_shader.set_uniform("u_tex", int(0));
+                glViewport(0, 0, display_w, display_h);
 
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, rt.color_);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-            glBindVertexArray(vao);
-            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-            glBindTexture(GL_TEXTURE_2D, 0);
-            glBindVertexArray(0);
-         }
+                glClearColor(0.30f, 0.55f, 0.60f, 1.00f);
+                glClear(GL_COLOR_BUFFER_BIT);
 
-         // Generate gui render commands
-         ImGui::Render();
+                quad_shader.use();
+                quad_shader.set_uniform("u_mvp", glm::value_ptr(mvp));
+                quad_shader.set_uniform("u_tex", int(0));
 
-         // Execute gui render commands using OpenGL backend
-         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+                glActiveTexture(GL_TEXTURE0);
+                glBindTexture(GL_TEXTURE_2D, rt.color_);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+                glBindVertexArray(vao);
+                glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+                glBindTexture(GL_TEXTURE_2D, 0);
+                glBindVertexArray(0);
+            }
 
-         // Swap the backbuffer with the frontbuffer that is used for screen display
-         glfwSwapBuffers(window);
-      }
+            // Generate gui render commands
+            ImGui::Render();
 
-      // Cleanup
-      ImGui_ImplOpenGL3_Shutdown();
-      ImGui_ImplGlfw_Shutdown();
-      ImGui::DestroyContext();
+            // Execute gui render commands using OpenGL backend
+            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
-      glfwDestroyWindow(window);
-      glfwTerminate();
-   }
-   catch (std::exception const & e)
-   {
-      spdlog::critical("{}", e.what());
-      return 1;
-   }
+            // Swap the backbuffer with the frontbuffer that is used for screen display
+            glfwSwapBuffers(window);
+        }
 
-   return 0;
+        // Cleanup
+        ImGui_ImplOpenGL3_Shutdown();
+        ImGui_ImplGlfw_Shutdown();
+        ImGui::DestroyContext();
+
+        glfwDestroyWindow(window);
+        glfwTerminate();
+    }
+    catch (std::exception const &e) {
+        spdlog::critical("{}", e.what());
+        return 1;
+    }
+
+    return 0;
 }
