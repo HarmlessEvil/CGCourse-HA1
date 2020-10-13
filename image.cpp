@@ -12,14 +12,14 @@ unsigned char image::operator()(std::size_t i, std::size_t j, std::size_t channe
     return (data_.get() + i * width_ * 4 + j * 4)[channel];
 }
 
-image::image(int width, int height, int channels, unsigned char *data, deleter_t const &deleter)
+image::image(size_t width, size_t height, int channels, unsigned char *data, deleter_t const &deleter)
         : width_(width), height_(height), channels_(channels), data_(data, deleter) {}
 
-int image::width() const {
+std::size_t image::width() const {
     return width_;
 }
 
-int image::height() const {
+std::size_t image::height() const {
     return height_;
 }
 

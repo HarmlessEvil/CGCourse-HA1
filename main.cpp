@@ -53,7 +53,7 @@ image load_image(std::string const &path, bool flip_vertically = true, int desir
         throw std::runtime_error(stbi_failure_reason());
     }
 
-    return image{width, height, channels, data, stbi_image_free};
+    return image{static_cast<size_t>(width), static_cast<size_t>(height), channels, data, stbi_image_free};
 }
 
 GLuint load_texture(image const &image, GLenum format) {

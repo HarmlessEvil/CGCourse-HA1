@@ -14,21 +14,21 @@ private:
     using deleter_t = std::function<void(unsigned char*)>;
 
 public:
-    image(int width, int height, int channels, unsigned char *data, deleter_t const &deleter);
+    image(size_t width, size_t height, int channels, unsigned char *data, deleter_t const &deleter);
 
     explicit operator bool() const;
 
     unsigned char operator()(std::size_t i, std::size_t j, std::size_t channel) const;
 
-    [[nodiscard]] int width() const;
+    [[nodiscard]] std::size_t width() const;
 
-    [[nodiscard]] int height() const;
+    [[nodiscard]] std::size_t height() const;
 
     [[nodiscard]] unsigned char const *data() const;
 
 private:
-    int width_{};
-    int height_{};
+    std::size_t width_{};
+    std::size_t height_{};
     int channels_{};
 
     std::unique_ptr<unsigned char, deleter_t> data_;
