@@ -10,9 +10,9 @@
 
 class terrain : public model {
 public:
-    explicit terrain(image const &height_map);
+    explicit terrain(image const &height_map, bool normalize_coordinates = false);
 
-    terrain(image const &height_map, std::size_t width, std::size_t height);
+    terrain(image const &height_map, std::size_t width, std::size_t height, bool normalize_coordinates = false);
 };
 
 

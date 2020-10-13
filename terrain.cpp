@@ -10,9 +10,11 @@
 #include <glm/glm.hpp>
 #include <glm/vec3.hpp>
 
-terrain::terrain(const image &height_map) : terrain(height_map, height_map.width(), height_map.height()) {}
+terrain::terrain(const image &height_map, bool normalize_coordinates)
+        : terrain(height_map, height_map.width(), height_map.height(), normalize_coordinates) {}
 
-terrain::terrain(const image &height_map, std::size_t width, std::size_t height) : model(width, height) {
+terrain::terrain(const image &height_map, std::size_t width, std::size_t height, bool normalize_coordinates)
+        : model(width, height) {
     if (width <= 0 || height <= 0) {
         throw std::invalid_argument("Width or height should be greater than 0");
     }
@@ -49,19 +51,31 @@ terrain::terrain(const image &height_map, std::size_t width, std::size_t height)
                     }
             };
 
-            coordinates_[i][j] = glm::vec3{
-                    j,
-                    i,
-                    glm::mix(
-                            glm::mix(nearest_heights[0][0], nearest_heights[0][1], width_shift),
-                            glm::mix(nearest_heights[1][0], nearest_heights[1][1], width_shift),
-                            height_shift
-                    )
-            };
+            if (normalize_coordinates) {
+                for (auto &item : nearest_heights) {
+                    item[0] /= 255;
+                    item[1] /= 255;
+                }
+            }
+
             texture_coordinates_[i][j] = glm::vec2{
                     static_cast<float>(j) / width,
                     static_cast<float>(i) / height
             };
+
+            glm::vec3 coordinate;
+            if (normalize_coordinates) {
+                coordinate = glm::vec3(texture_coordinates_[i][j], 0);
+            } else {
+                coordinate = glm::vec3(j, i, 0);
+            }
+            coordinate.z = glm::mix(
+                    glm::mix(nearest_heights[0][0], nearest_heights[0][1], width_shift),
+                    glm::mix(nearest_heights[1][0], nearest_heights[1][1], width_shift),
+                    height_shift
+            );
+
+            coordinates_[i][j] = coordinate;
         }
     }
 
@@ -116,9 +130,9 @@ terrain::terrain(const image &height_map, std::size_t width, std::size_t height)
                     {0, 0}
             },
             {
-                    {0, -1},
+                    {0,  -1},
                     {1, -1},
-                    {0, 0},
+                    {0,  0},
                     {1, 0}
             },
             {
@@ -128,9 +142,9 @@ terrain::terrain(const image &height_map, std::size_t width, std::size_t height)
                     {0, 1}
             },
             {
-                    {0, 0},
+                    {0,  0},
                     {1, 0},
-                    {0, 1},
+                    {0,  1},
                     {1, 1}
             }
     };

@@ -232,7 +232,7 @@ render_target_t::~render_target_t() {
 
 int main(int, char **) {
     image height_map = load_image("assets/textures/height_maps/fjord.png");
-    terrain terrain{height_map};
+    terrain terrain{height_map, true};
 
     try {
         // Use GLFW to create a simple window
@@ -365,7 +365,7 @@ int main(int, char **) {
             {
                 auto model = glm::rotate<float>(glm::translate(translation),
                                                 rotation, //0.1 * (-1 + 2 * cos(time_from_start) * cos(time_from_start)),
-                                                glm::vec3(0, 1, 0)); //* glm::scale(glm::vec3(7, 7, 7));
+                                                glm::vec3(0, 1, 0)) * glm::scale(glm::vec3(1000, 1000, 255));
                 auto view = glm::lookAt<float>(eye, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
                 auto projection = glm::perspective<float>(90, float(display_w) / display_h, 0.1, 1000);
                 auto mvp = projection * view * model;
