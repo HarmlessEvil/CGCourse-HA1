@@ -118,33 +118,36 @@ void create_terrain(terrain const &terrain, GLuint &vbo, GLuint &vao, GLuint &eb
     // position: float3, normal: float3, tex_coord: float2
     std::vector<float> buffer{};
 
+    for (std::size_t i = 0; i < terrain.height(); ++i) {
+        for (std::size_t j = 0; j < terrain.width(); ++j) {
+            glm::vec3 coordinate = terrain.coordinates()[i][j];
+            buffer.push_back(coordinate.x);
+            buffer.push_back(coordinate.y);
+            buffer.push_back(coordinate.z);
+
+            glm::vec3 normal = terrain.normals()[i][j];
+            buffer.push_back(normal.x);
+            buffer.push_back(normal.y);
+            buffer.push_back(normal.z);
+
+            glm::vec2 texture_coordinates = terrain.texture_coordinates()[i][j];
+            buffer.push_back(texture_coordinates.x);
+            buffer.push_back(texture_coordinates.y);
+        }
+    }
+
+    std::vector<std::uint32_t> indices{};
+    indices.reserve(terrain.quads_count() * 2 * 3);
+
     for (const auto &quad_row : terrain.quads()) {
         for (const auto &quad : quad_row) {
             for (const auto &triangle : quad) {
-                for (const auto &vertex : triangle.indices) {
-                    size_t i = vertex.first;
-                    size_t j = vertex.second;
-
-                    glm::vec3 coordinate = terrain.coordinates()[i][j];
-                    buffer.push_back(coordinate.x);
-                    buffer.push_back(coordinate.y);
-                    buffer.push_back(coordinate.z);
-
-                    glm::vec3 normal = terrain.normals()[i][j];
-                    buffer.push_back(normal.x);
-                    buffer.push_back(normal.y);
-                    buffer.push_back(normal.z);
-
-                    glm::vec2 texture_coordinates = terrain.texture_coordinates()[i][j];
-                    buffer.push_back(texture_coordinates.x);
-                    buffer.push_back(texture_coordinates.y);
+                for (const auto &index : triangle.indices) {
+                    indices.push_back(index.first * terrain.width() + index.second);
                 }
             }
         }
     }
-
-    std::vector<std::uint32_t> indices(terrain.quads_count() * 2 * 3);
-    std::iota(indices.begin(), indices.end(), 0);
 
     glGenVertexArrays(1, &vao);
     glGenBuffers(1, &vbo);
