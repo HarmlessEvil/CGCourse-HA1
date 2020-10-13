@@ -4,8 +4,8 @@
 
 #include "model.hpp"
 
-#include <glm/glm.hpp>
-#include <utility>
+#include <glm/vec2.hpp>
+#include <glm/vec3.hpp>
 
 const std::vector<std::vector<glm::vec3>> &model::coordinates() const {
     return coordinates_;
@@ -15,16 +15,32 @@ const std::vector<std::vector<glm::vec2>> &model::texture_coordinates() const {
     return texture_coordinates_;
 }
 
-model::model(
-        std::vector<std::vector<glm::vec3>> coordinates,
-        std::vector<std::vector<glm::vec2>> texture_coordinates,
-        std::vector<triangle_face> triangles
-) : coordinates_(std::move(coordinates)),
-    texture_coordinates_(std::move(texture_coordinates)),
-    triangles_(std::move(triangles)) {
+const std::vector<std::vector<model::quad>> &model::quads() const {
+    return quads_;
+}
+
+model::model(std::size_t width, std::size_t height)
+        : width_(width),
+          height_(height),
+          coordinates_(height, std::vector<glm::vec3>(width)),
+          normals_(height, std::vector<glm::vec3>(width)),
+          texture_coordinates_(height, std::vector<glm::vec2>(width)),
+          quads_(height - 1, std::vector<quad>(width - 1)) {
 
 }
 
-const std::vector<model::triangle_face> &model::triangles() const {
-    return triangles_;
+std::size_t model::width() const {
+    return width_;
+}
+
+std::size_t model::height() const {
+    return height_;
+}
+
+std::size_t model::quads_count() const {
+    return width_ * height_;
+}
+
+const std::vector<std::vector<glm::vec3>> &model::normals() const {
+    return normals_;
 }

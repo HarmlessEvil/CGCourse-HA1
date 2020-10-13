@@ -118,27 +118,32 @@ void create_terrain(terrain const &terrain, GLuint &vbo, GLuint &vao, GLuint &eb
     // position: float3, normal: float3, tex_coord: float2
     std::vector<float> buffer{};
 
-    for (const auto &triangle : terrain.triangles()) {
-        for (const auto &vertex : triangle.indices) {
-            std::size_t i = vertex.first;
-            std::size_t j = vertex.second;
+    for (const auto &quad_row : terrain.quads()) {
+        for (const auto &quad : quad_row) {
+            for (const auto &triangle : quad) {
+                for (const auto &vertex : triangle.indices) {
+                    size_t i = vertex.first;
+                    size_t j = vertex.second;
 
-            glm::vec3 coordinates = terrain.coordinates()[i][j];
-            buffer.push_back(coordinates.x);
-            buffer.push_back(coordinates.y);
-            buffer.push_back(coordinates.z);
+                    glm::vec3 coordinate = terrain.coordinates()[i][j];
+                    buffer.push_back(coordinate.x);
+                    buffer.push_back(coordinate.y);
+                    buffer.push_back(coordinate.z);
 
-            buffer.push_back(triangle.normal.x);
-            buffer.push_back(triangle.normal.y);
-            buffer.push_back(triangle.normal.z);
+                    glm::vec3 normal = terrain.normals()[i][j];
+                    buffer.push_back(normal.x);
+                    buffer.push_back(normal.y);
+                    buffer.push_back(normal.z);
 
-            glm::vec2 texture_coordinates = terrain.texture_coordinates()[i][j];
-            buffer.push_back(texture_coordinates.x);
-            buffer.push_back(texture_coordinates.y);
+                    glm::vec2 texture_coordinates = terrain.texture_coordinates()[i][j];
+                    buffer.push_back(texture_coordinates.x);
+                    buffer.push_back(texture_coordinates.y);
+                }
+            }
         }
     }
 
-    std::vector<std::uint32_t> indices(terrain.triangles().size() * 3);
+    std::vector<std::uint32_t> indices(terrain.quads_count() * 2 * 3);
     std::iota(indices.begin(), indices.end(), 0);
 
     glGenVertexArrays(1, &vao);
@@ -223,7 +228,7 @@ render_target_t::~render_target_t() {
 
 
 int main(int, char **) {
-    image height_map = load_image("assets/textures/height_map.png");
+    image height_map = load_image("assets/textures/height_maps/fjord.png");
     terrain terrain{height_map};
 
     try {
@@ -304,7 +309,12 @@ int main(int, char **) {
             static bool wireframe = false;
             ImGui::Checkbox("wireframe", &wireframe);
             static int elements = 300;
-            ImGui::SliderInt("elements", &elements, 0, static_cast<int>(terrain.triangles().size() * 3));
+            ImGui::SliderInt(
+                    "elements",
+                    &elements,
+                    0,
+                    static_cast<int>(terrain.quads_count() * 2 * 3) // 2 triangles, 3 vertices each in all quads
+            );
             //static float color[4] = { 1.0f,1.0f,1.0f,1.0f };
             //ImGui::ColorEdit3("color", color);
             ImGui::End();

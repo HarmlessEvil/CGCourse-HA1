@@ -19,22 +19,32 @@ public:
         glm::vec3 normal;
     };
 
-    explicit model(
-            std::vector<std::vector<glm::vec3>>  coordinates = {},
-            std::vector<std::vector<glm::vec2>>  texture_coordinates = {},
-            std::vector<triangle_face>  triangles = {}
-    );
+    using quad = std::array<triangle_face, 2>;
+
+    model(std::size_t width, std::size_t height);
 
     [[nodiscard]] const std::vector<std::vector<glm::vec3>> &coordinates() const;
 
+    [[nodiscard]] const std::vector<std::vector<glm::vec3>> &normals() const;
+
     [[nodiscard]] const std::vector<std::vector<glm::vec2>> &texture_coordinates() const;
 
-    [[nodiscard]] const std::vector<triangle_face> &triangles() const;
+    [[nodiscard]] const std::vector<std::vector<quad>> &quads() const;
+
+    [[nodiscard]] std::size_t width() const;
+
+    [[nodiscard]] std::size_t height() const;
+
+    [[nodiscard]] std::size_t quads_count() const;
 
 protected:
     std::vector<std::vector<glm::vec3>> coordinates_;
+    std::vector<std::vector<glm::vec3>> normals_;
     std::vector<std::vector<glm::vec2>> texture_coordinates_;
-    std::vector<triangle_face> triangles_;
+    std::vector<std::vector<quad>> quads_;
+
+    std::size_t width_;
+    std::size_t height_;
 };
 
 #endif //OPENGL_IMGUI_SAMPLE_MODEL_HPP
