@@ -1,8 +1,10 @@
 #pragma optimize("", off)
 
+#include <algorithm>
 #include <chrono>
 #include <iostream>
-#include <numeric>
+#include <memory>
+#include <utility>
 #include <vector>
 
 #include <fmt/format.h>
@@ -115,7 +117,7 @@ void create_quad(GLuint &vbo, GLuint &vao, GLuint &ebo) {
 }
 
 void create_terrain(terrain const &terrain, GLuint &vbo, GLuint &vao, GLuint &ebo) {
-    // position: float3, normal: float3, tex_coord: float2
+    // position: float3, normal: float3, tex_coord: float3
     std::vector<float> buffer{};
 
     for (std::size_t i = 0; i < terrain.height(); ++i) {
@@ -130,9 +132,10 @@ void create_terrain(terrain const &terrain, GLuint &vbo, GLuint &vao, GLuint &eb
             buffer.push_back(normal.y);
             buffer.push_back(normal.z);
 
-            glm::vec2 texture_coordinates = terrain.texture_coordinates()[i][j];
+            glm::vec3 texture_coordinates = terrain.texture_coordinates()[i][j];
             buffer.push_back(texture_coordinates.x);
             buffer.push_back(texture_coordinates.y);
+            buffer.push_back(texture_coordinates.z);
         }
     }
 
@@ -161,12 +164,12 @@ void create_terrain(terrain const &terrain, GLuint &vbo, GLuint &vao, GLuint &eb
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(std::uint32_t), indices.data(), GL_STATIC_DRAW);
 
-    const GLsizei stride = 8 * sizeof(float);
+    const GLsizei stride = 9 * sizeof(float);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void *) 0);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (void *) (3 * sizeof(float)));
     glEnableVertexAttribArray(1);
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, stride, (void *) (6 * sizeof(float)));
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, stride, (void *) (6 * sizeof(float)));
     glEnableVertexAttribArray(2);
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -229,10 +232,87 @@ render_target_t::~render_target_t() {
     glDeleteTextures(1, &color_);
 }
 
+float texture_level_by_coordinate_and_normal(glm::vec3 const &position, glm::vec3 const &normal) {
+    if (position.z < 0.25) {
+        return 0;
+    }
+
+    if (position.z < 0.5) {
+        return 1;
+    }
+
+    if (position.z < 0.75) {
+        return 2;
+    }
+
+    return 3;
+}
+
+std::vector<image> load_terrain_texture_array(std::vector<std::string> const &paths) {
+    std::vector<image> images;
+    images.reserve(paths.size());
+
+    for (const auto &path : paths) {
+        images.push_back(load_image(path, true));
+    }
+
+    return images;
+}
+
+GLuint create_terrain_texture_array(
+        std::vector<image> const &images,
+        GLsizei width,
+        GLsizei height,
+        GLsizei layers
+) {
+    GLuint texture;
+    glGenTextures(1, &texture);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, texture);
+
+    glTexStorage3D(GL_TEXTURE_2D_ARRAY, 1, GL_RGB8, width, height, layers);
+    for (GLsizei layer = 0; layer < layers; ++layer) {
+        image const &image = images[layer];
+
+        glTexSubImage3D(
+                GL_TEXTURE_2D_ARRAY,
+                0,
+                0,
+                0,
+                layer,
+                image.width(),
+                image.height(),
+                1,
+                GL_RGB,
+                GL_UNSIGNED_BYTE,
+                image.data()
+        );
+    }
+
+    glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
+
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+    glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
+    return texture;
+}
 
 int main(int, char **) {
     image height_map = load_image("assets/textures/height_maps/fjord.png");
-    terrain terrain{height_map, true};
+    terrain terrain{height_map, true, texture_level_by_coordinate_and_normal};
+
+    auto terrain_textures = load_terrain_texture_array(
+            {
+                    "assets/textures/terrain/water.jpg",
+                    "assets/textures/terrain/dirt.jpg",
+                    "assets/textures/terrain/stone.jpg",
+                    "assets/textures/terrain/snow.jpg"
+            }
+    );
 
     try {
         // Use GLFW to create a simple window
@@ -266,6 +346,13 @@ int main(int, char **) {
         GLuint vbo, vao, ebo;
         create_terrain(terrain, vbo, vao, ebo);
 //        create_quad(vbo, vao, ebo);
+
+        GLuint terrain_texture_array = create_terrain_texture_array(
+                terrain_textures,
+                1024,
+                1024,
+                4
+        );
 
         // init shader
         shader_t terrain_shader(
@@ -323,7 +410,8 @@ int main(int, char **) {
             ImGui::End();
 
             float const time_from_start = (float) (
-                    std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start_time).count() /
+                    std::chrono::duration<double, std::milli>(
+                            std::chrono::steady_clock::now() - start_time).count() /
                     1000.0);
 
 
@@ -383,6 +471,7 @@ int main(int, char **) {
 
                 terrain_shader.use();
                 terrain_shader.set_uniform("u_mvp", glm::value_ptr(mvp));
+                terrain_shader.set_uniform("u_tex", int(0));
 
 //                quad_shader.use();
 //                quad_shader.set_uniform("u_mvp", glm::value_ptr(mvp));
@@ -392,13 +481,11 @@ int main(int, char **) {
                     glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
                 }
 
-//                glActiveTexture(GL_TEXTURE0);
-//                glBindTexture(GL_TEXTURE_2D, rt.color_);
-//                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-//                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+                glActiveTexture(GL_TEXTURE0);
+                glBindTexture(GL_TEXTURE_2D_ARRAY, terrain_texture_array);
                 glBindVertexArray(vao);
                 glDrawElements(GL_TRIANGLES, elements, GL_UNSIGNED_INT, 0);
-//                glBindTexture(GL_TEXTURE_2D, 0);
+                glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
                 glBindVertexArray(0);
 
                 if (wireframe) {

@@ -11,7 +11,7 @@ const std::vector<std::vector<glm::vec3>> &model::coordinates() const {
     return coordinates_;
 }
 
-const std::vector<std::vector<glm::vec2>> &model::texture_coordinates() const {
+const std::vector<std::vector<glm::vec3>> &model::texture_coordinates() const {
     return texture_coordinates_;
 }
 
@@ -24,7 +24,7 @@ model::model(std::size_t width, std::size_t height)
           height_(height),
           coordinates_(height, std::vector<glm::vec3>(width)),
           normals_(height, std::vector<glm::vec3>(width)),
-          texture_coordinates_(height, std::vector<glm::vec2>(width)),
+          texture_coordinates_(height, std::vector<glm::vec3>(width)),
           quads_(height - 1, std::vector<quad>(width - 1)) {
 
 }

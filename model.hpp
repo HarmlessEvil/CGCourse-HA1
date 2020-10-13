@@ -27,7 +27,7 @@ public:
 
     [[nodiscard]] const std::vector<std::vector<glm::vec3>> &normals() const;
 
-    [[nodiscard]] const std::vector<std::vector<glm::vec2>> &texture_coordinates() const;
+    [[nodiscard]] const std::vector<std::vector<glm::vec3>> &texture_coordinates() const;
 
     [[nodiscard]] const std::vector<std::vector<quad>> &quads() const;
 
@@ -40,7 +40,7 @@ public:
 protected:
     std::vector<std::vector<glm::vec3>> coordinates_;
     std::vector<std::vector<glm::vec3>> normals_;
-    std::vector<std::vector<glm::vec2>> texture_coordinates_;
+    std::vector<std::vector<glm::vec3>> texture_coordinates_;
     std::vector<std::vector<quad>> quads_;
 
     std::size_t width_;

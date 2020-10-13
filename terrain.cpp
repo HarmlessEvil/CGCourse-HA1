@@ -10,11 +10,25 @@
 #include <glm/glm.hpp>
 #include <glm/vec3.hpp>
 
-terrain::terrain(const image &height_map, bool normalize_coordinates)
-        : terrain(height_map, height_map.width(), height_map.height(), normalize_coordinates) {}
+terrain::terrain(
+        const image &height_map,
+        bool normalize_coordinates,
+        std::function<float(glm::vec3 const &, glm::vec3 const &)> const &coordinate_to_texture_level_mapper
+) : terrain(
+        height_map,
+        height_map.width(),
+        height_map.height(),
+        normalize_coordinates,
+        coordinate_to_texture_level_mapper
+) {}
 
-terrain::terrain(const image &height_map, std::size_t width, std::size_t height, bool normalize_coordinates)
-        : model(width, height) {
+terrain::terrain(
+        const image &height_map,
+        std::size_t width,
+        std::size_t height,
+        bool normalize_coordinates,
+        std::function<float(glm::vec3 const &, glm::vec3 const &)> const &coordinate_to_texture_level_mapper
+) : model(width, height) {
     if (width <= 0 || height <= 0) {
         throw std::invalid_argument("Width or height should be greater than 0");
     }
@@ -58,14 +72,15 @@ terrain::terrain(const image &height_map, std::size_t width, std::size_t height,
                 }
             }
 
-            texture_coordinates_[i][j] = glm::vec2{
-                    static_cast<float>(j) / width,
-                    static_cast<float>(i) / height
+            texture_coordinates_[i][j] = glm::vec3{
+                    static_cast<float>(j) / 250,
+                    static_cast<float>(i) / 250,
+                    0
             };
 
             glm::vec3 coordinate;
             if (normalize_coordinates) {
-                coordinate = glm::vec3(texture_coordinates_[i][j], 0);
+                coordinate = glm::vec3(static_cast<float>(j) / width, static_cast<float>(i) / height, 0);
             } else {
                 coordinate = glm::vec3(j, i, 0);
             }
@@ -192,6 +207,9 @@ terrain::terrain(const image &height_map, std::size_t width, std::size_t height,
                 }
 
                 normals_[index.first][index.second] = sum_of_normals / count;
+                texture_coordinates_[index.first][index.second].z = coordinate_to_texture_level_mapper(
+                        coordinates_[index.first][index.second], normals_[index.first][index.second]
+                );
             }
         }
     }
