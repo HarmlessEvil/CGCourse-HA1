@@ -1,8 +1,9 @@
 #pragma optimize("", off)
 
-#include <iostream>
-#include <vector>
 #include <chrono>
+#include <iostream>
+#include <numeric>
+#include <vector>
 
 #include <fmt/format.h>
 #include <spdlog/spdlog.h>
@@ -34,6 +35,7 @@
 #include "opengl_shader.h"
 
 #include "image.hpp"
+#include "model.hpp"
 #include "obj_model.h"
 #include "terrain.hpp"
 
@@ -48,8 +50,7 @@ image load_image(std::string const &path, bool flip_vertically = true, int desir
     }
 
     if (!data) {
-        std::cout << stbi_failure_reason() << std::endl;
-        exit(1);
+        throw std::runtime_error(stbi_failure_reason());
     }
 
     return image{width, height, channels, data, stbi_image_free};
@@ -110,6 +111,58 @@ void create_quad(GLuint &vbo, GLuint &vao, GLuint &ebo) {
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void *) (2 * sizeof(float)));
     glEnableVertexAttribArray(1);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+}
+
+void create_terrain(terrain const &terrain, GLuint &vbo, GLuint &vao, GLuint &ebo) {
+    // position: float3, normal: float3, tex_coord: float2
+    std::vector<float> buffer{};
+
+    for (const auto &triangle : terrain.triangles()) {
+        for (const auto &vertex : triangle.indices) {
+            std::size_t i = vertex.first;
+            std::size_t j = vertex.second;
+
+            glm::vec3 coordinates = terrain.coordinates()[i][j];
+            buffer.push_back(coordinates.x);
+            buffer.push_back(coordinates.y);
+            buffer.push_back(coordinates.z);
+
+            buffer.push_back(triangle.normal.x);
+            buffer.push_back(triangle.normal.y);
+            buffer.push_back(triangle.normal.z);
+
+            glm::vec2 texture_coordinates = terrain.texture_coordinates()[i][j];
+            buffer.push_back(texture_coordinates.x);
+            buffer.push_back(texture_coordinates.y);
+        }
+    }
+
+    std::vector<std::uint32_t> indices(terrain.triangles().size() * 3);
+    std::iota(indices.begin(), indices.end(), 0);
+
+    glGenVertexArrays(1, &vao);
+    glGenBuffers(1, &vbo);
+    glGenBuffers(1, &ebo);
+
+    glBindVertexArray(vao);
+
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferData(GL_ARRAY_BUFFER, buffer.size() * sizeof(float), buffer.data(), GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(std::uint32_t), indices.data(), GL_STATIC_DRAW);
+
+    const GLsizei stride = 8 * sizeof(float);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void *) 0);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (void *) (3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, stride, (void *) (6 * sizeof(float)));
+    glEnableVertexAttribArray(2);
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
     glBindVertexArray(0);
 }
 
@@ -203,9 +256,14 @@ int main(int, char **) {
         render_target_t rt(512, 512);
 
         GLuint vbo, vao, ebo;
-        create_quad(vbo, vao, ebo);
+        create_terrain(terrain, vbo, vao, ebo);
+//        create_quad(vbo, vao, ebo);
 
         // init shader
+        shader_t terrain_shader(
+                "assets/shaders/terrain.vs.glsl",
+                "assets/shaders/terrain.fs.glsl"
+        );
         shader_t quad_shader(
                 "assets/shaders/simple-shader.vs",
                 "assets/shaders/simple-shader.fs"
@@ -236,14 +294,20 @@ int main(int, char **) {
             ImGui::NewFrame();
 
             // GUI
-            //ImGui::Begin("Triangle Position/Color");
-            //static float rotation = 0.0;
-            //ImGui::SliderFloat("rotation", &rotation, 0, 2 * glm::pi<float>());
-            //static float translation[] = { 0.0, 0.0 };
-            //ImGui::SliderFloat2("position", translation, -1.0, 1.0);
+            ImGui::Begin("Triangle Position/Color");
+            static float rotation = 0.0;
+            ImGui::SliderFloat("rotation", &rotation, 0, 2 * glm::pi<float>());
+            static glm::vec3 translation = {0.0, 0.0, 0.0};
+            ImGui::SliderFloat3("position", glm::value_ptr(translation), -1000.0, 1000.0);
+            static glm::vec3 eye = {0, 0, -1};
+            ImGui::SliderFloat3("eye", glm::value_ptr(eye), -1000.0f, 1000.0f);
+            static bool wireframe = false;
+            ImGui::Checkbox("wireframe", &wireframe);
+            static int elements = 300;
+            ImGui::SliderInt("elements", &elements, 0, static_cast<int>(terrain.triangles().size() * 3));
             //static float color[4] = { 1.0f,1.0f,1.0f,1.0f };
             //ImGui::ColorEdit3("color", color);
-            //ImGui::End();
+            ImGui::End();
 
             float const time_from_start = (float) (
                     std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start_time).count() /
@@ -251,65 +315,82 @@ int main(int, char **) {
 
 
             // Render offscreen
-            {
-                auto model = glm::rotate(glm::mat4(1), glm::radians(time_from_start * 10), glm::vec3(0, 1, 0)) *
-                             glm::scale(glm::vec3(7, 7, 7));
-                auto view = glm::lookAt<float>(glm::vec3(0, 1, 1), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
-                auto projection = glm::perspective<float>(90, float(rt.width_) / rt.height_, 0.1, 100);
-                auto mvp = projection * view * model;
-
-
-                glBindFramebuffer(GL_FRAMEBUFFER, rt.fbo_);
-                glViewport(0, 0, rt.width_, rt.height_);
-                glEnable(GL_DEPTH_TEST);
-                glColorMask(1, 1, 1, 1);
-                glDepthMask(1);
-                glDepthFunc(GL_LEQUAL);
-
-                glClearColor(0.3, 0.3, 0.3, 1);
-                glClearDepth(1);
-                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-                bunny_shader.use();
-                bunny_shader.set_uniform("u_mvp", glm::value_ptr(mvp));
-                bunny_shader.set_uniform("u_model", glm::value_ptr(model));
-
-                glm::vec3 light_dir = glm::rotateY(glm::vec3(1, 0, 0), glm::radians(time_from_start * 60));
-
-                bunny_shader.set_uniform<float>("u_color", 0.83, 0.64, 0.31);
-                bunny_shader.set_uniform<float>("u_light", light_dir.x, light_dir.y, light_dir.z);
-                bunny->draw();
-
-                glDisable(GL_DEPTH_TEST);
-                glBindFramebuffer(GL_FRAMEBUFFER, 0);
-            }
+//            {
+//                auto model = glm::rotate(glm::mat4(1), glm::radians(time_from_start * 10), glm::vec3(0, 1, 0)) *
+//                             glm::scale(glm::vec3(7, 7, 7));
+//                auto view = glm::lookAt<float>(glm::vec3(0, 1, 1), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+//                auto projection = glm::perspective<float>(90, float(rt.width_) / rt.height_, 0.1, 100);
+//                auto mvp = projection * view * model;
+//
+//
+//                glBindFramebuffer(GL_FRAMEBUFFER, rt.fbo_);
+//                glViewport(0, 0, rt.width_, rt.height_);
+//                glEnable(GL_DEPTH_TEST);
+//                glColorMask(1, 1, 1, 1);
+//                glDepthMask(1);
+//                glDepthFunc(GL_LEQUAL);
+//
+//                glClearColor(0.3, 0.3, 0.3, 1);
+//                glClearDepth(1);
+//                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+//
+//                bunny_shader.use();
+//                bunny_shader.set_uniform("u_mvp", glm::value_ptr(mvp));
+//                bunny_shader.set_uniform("u_model", glm::value_ptr(model));
+//
+//                glm::vec3 light_dir = glm::rotateY(glm::vec3(1, 0, 0), glm::radians(time_from_start * 60));
+//
+//                bunny_shader.set_uniform<float>("u_color", 0.83, 0.64, 0.31);
+//                bunny_shader.set_uniform<float>("u_light", light_dir.x, light_dir.y, light_dir.z);
+//                bunny->draw();
+//
+//                glDisable(GL_DEPTH_TEST);
+//                glBindFramebuffer(GL_FRAMEBUFFER, 0);
+//            }
 
             // Render main
             {
-                auto model = glm::rotate<float>(glm::mat4(1),
-                                                0.1 * (-1 + 2 * cos(time_from_start) * cos(time_from_start)),
-                                                glm::vec3(0, 1, 0));// *glm::scale(glm::vec3(7, 7, 7));
-                auto view = glm::lookAt<float>(glm::vec3(0, 0, -1), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
-                auto projection = glm::perspective<float>(90, float(display_w) / display_h, 0.1, 100);
+                auto model = glm::rotate<float>(glm::translate(translation),
+                                                rotation, //0.1 * (-1 + 2 * cos(time_from_start) * cos(time_from_start)),
+                                                glm::vec3(0, 1, 0)); //* glm::scale(glm::vec3(7, 7, 7));
+                auto view = glm::lookAt<float>(eye, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+                auto projection = glm::perspective<float>(90, float(display_w) / display_h, 0.1, 1000);
                 auto mvp = projection * view * model;
 
                 glViewport(0, 0, display_w, display_h);
 
+                glEnable(GL_CULL_FACE);
+                glEnable(GL_DEPTH_TEST);
+
                 glClearColor(0.30f, 0.55f, 0.60f, 1.00f);
-                glClear(GL_COLOR_BUFFER_BIT);
+                glDepthMask(1);
+                glClearDepth(1);
 
-                quad_shader.use();
-                quad_shader.set_uniform("u_mvp", glm::value_ptr(mvp));
-                quad_shader.set_uniform("u_tex", int(0));
+                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-                glActiveTexture(GL_TEXTURE0);
-                glBindTexture(GL_TEXTURE_2D, rt.color_);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+                terrain_shader.use();
+                terrain_shader.set_uniform("u_mvp", glm::value_ptr(mvp));
+
+//                quad_shader.use();
+//                quad_shader.set_uniform("u_mvp", glm::value_ptr(mvp));
+//                quad_shader.set_uniform("u_tex", int(0));
+
+                if (wireframe) {
+                    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+                }
+
+//                glActiveTexture(GL_TEXTURE0);
+//                glBindTexture(GL_TEXTURE_2D, rt.color_);
+//                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+//                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
                 glBindVertexArray(vao);
-                glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-                glBindTexture(GL_TEXTURE_2D, 0);
+                glDrawElements(GL_TRIANGLES, elements, GL_UNSIGNED_INT, 0);
+//                glBindTexture(GL_TEXTURE_2D, 0);
                 glBindVertexArray(0);
+
+                if (wireframe) {
+                    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+                }
             }
 
             // Generate gui render commands
