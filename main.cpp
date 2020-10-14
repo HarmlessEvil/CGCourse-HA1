@@ -39,6 +39,7 @@
 #include "image.hpp"
 #include "rectangular_model.hpp"
 #include "obj_model.h"
+#include "player.hpp"
 #include "terrain.hpp"
 #include "toric_terrain.hpp"
 
@@ -117,23 +118,23 @@ void create_quad(GLuint &vbo, GLuint &vao, GLuint &ebo) {
     glBindVertexArray(0);
 }
 
-void create_terrain(terrain const &terrain, GLuint &vbo, GLuint &vao, GLuint &ebo) {
+void create_terrain(const std::shared_ptr<terrain> &terrain, GLuint &vbo, GLuint &vao, GLuint &ebo) {
     // position: float3, normal: float3, tex_coord: float3
     std::vector<float> buffer{};
 
-    for (std::size_t i = 0; i < terrain.height(); ++i) {
-        for (std::size_t j = 0; j < terrain.width(); ++j) {
-            glm::vec3 coordinate = terrain.coordinates()[i][j];
+    for (std::size_t i = 0; i < terrain->height(); ++i) {
+        for (std::size_t j = 0; j < terrain->width(); ++j) {
+            glm::vec3 coordinate = terrain->coordinates()[i][j];
             buffer.push_back(coordinate.x);
             buffer.push_back(coordinate.y);
             buffer.push_back(coordinate.z);
 
-            glm::vec3 normal = terrain.normals()[i][j];
+            glm::vec3 normal = terrain->normals()[i][j];
             buffer.push_back(normal.x);
             buffer.push_back(normal.y);
             buffer.push_back(normal.z);
 
-            glm::vec3 texture_coordinates = terrain.texture_coordinates()[i][j];
+            glm::vec3 texture_coordinates = terrain->texture_coordinates()[i][j];
             buffer.push_back(texture_coordinates.x);
             buffer.push_back(texture_coordinates.y);
             buffer.push_back(texture_coordinates.z);
@@ -141,13 +142,13 @@ void create_terrain(terrain const &terrain, GLuint &vbo, GLuint &vao, GLuint &eb
     }
 
     std::vector<std::uint32_t> indices{};
-    indices.reserve(terrain.quads_count() * 2 * 3);
+    indices.reserve(terrain->quads_count() * 2 * 3);
 
-    for (const auto &quad_row : terrain.quads()) {
+    for (const auto &quad_row : terrain->quads()) {
         for (const auto &quad : quad_row) {
             for (const auto &triangle : quad) {
                 for (const auto &index : triangle.indices) {
-                    indices.push_back(index.first * terrain.width() + index.second);
+                    indices.push_back(index.first * terrain->width() + index.second);
                 }
             }
         }
@@ -281,7 +282,7 @@ GLuint create_terrain_texture_array(
 
     glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
 
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_REPEAT);
@@ -292,14 +293,15 @@ GLuint create_terrain_texture_array(
 
 int main(int, char **) {
     image height_map = load_image("assets/textures/height_maps/mountain.png");
-    toric_terrain toric_terrain{terrain{
+    std::shared_ptr<terrain> main_terrain = std::make_shared<toric_terrain>(terrain{
             height_map,
             2000,
             2000,
             true,
             false,
             texture_level_by_coordinate_and_normal
-    }, 5, 1};
+    }, 5, 1);
+    main_terrain->set_scale(100);
 
     auto terrain_textures = load_terrain_texture_array(
             {
@@ -341,8 +343,7 @@ int main(int, char **) {
         render_target_t rt(512, 512);
 
         GLuint vbo, vao, ebo;
-        create_terrain(toric_terrain, vbo, vao, ebo);
-//        create_quad(vbo, vao, ebo);
+        create_terrain(main_terrain, vbo, vao, ebo);
 
         GLuint terrain_texture_array = create_terrain_texture_array(
                 terrain_textures,
@@ -356,11 +357,9 @@ int main(int, char **) {
                 "assets/shaders/terrain.vs.glsl",
                 "assets/shaders/terrain.fs.glsl"
         );
-        shader_t quad_shader(
-                "assets/shaders/simple-shader.vs",
-                "assets/shaders/simple-shader.fs"
-        );
         shader_t bunny_shader("assets/shaders/model.vs", "assets/shaders/model.fs");
+        player player(bunny, bunny_shader, main_terrain);
+        player.set_position({750, 5});
 
         // Setup GUI context
         IMGUI_CHECKVERSION();
@@ -387,21 +386,21 @@ int main(int, char **) {
 
             // GUI
             ImGui::Begin("Triangle Position/Color");
-            static float rotation = 0.0;
-            ImGui::SliderFloat("rotation", &rotation, 0, 2 * glm::pi<float>());
-            static glm::vec3 translation = {0.0, 0.0, 0.0};
-            ImGui::SliderFloat3("position", glm::value_ptr(translation), -1000.0, 1000.0);
-            static glm::vec3 eye = {0, 0, -1};
-            ImGui::SliderFloat3("eye", glm::value_ptr(eye), -1000.0f, 1000.0f);
-            static bool wireframe = false;
-            ImGui::Checkbox("wireframe", &wireframe);
-            static int elements = 300;
-            ImGui::SliderInt(
-                    "elements",
-                    &elements,
-                    0,
-                    static_cast<int>(toric_terrain.quads_count() * 2 * 3) // 2 triangles, 3 vertices each in all quads
-            );
+//            static float rotation = 0.0;
+//            ImGui::SliderFloat("rotation", &rotation, 0, 2 * glm::pi<float>());
+//            static glm::vec3 translation = {0.0, 0.0, 0.0};
+            ImGui::SliderFloat3("camera_shift", glm::value_ptr(player.camera_shift_), -5, 5);
+//            static glm::vec3 eye = {0, 0, -1};
+//            ImGui::SliderFloat3("eye", glm::value_ptr(eye), -1000.0f, 1000.0f);
+//            static bool wireframe = false;
+//            ImGui::Checkbox("wireframe", &wireframe);
+//            static int elements = 300;
+//            ImGui::SliderInt(
+//                    "elements",
+//                    &elements,
+//                    0,
+//                    static_cast<int>(toric_terrain.quads_count() * 2 * 3) // 2 triangles, 3 vertices each in all quads
+//            );
             //static float color[4] = { 1.0f,1.0f,1.0f,1.0f };
             //ImGui::ColorEdit3("color", color);
             ImGui::End();
@@ -411,16 +410,8 @@ int main(int, char **) {
                             std::chrono::steady_clock::now() - start_time).count() /
                     1000.0);
 
-
             // Render offscreen
-//            {
-//                auto model = glm::rotate(glm::mat4(1), glm::radians(time_from_start * 10), glm::vec3(0, 1, 0)) *
-//                             glm::scale(glm::vec3(7, 7, 7));
-//                auto view = glm::lookAt<float>(glm::vec3(0, 1, 1), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
-//                auto projection = glm::perspective<float>(90, float(rt.width_) / rt.height_, 0.1, 100);
-//                auto mvp = projection * view * model;
-//
-//
+            {
 //                glBindFramebuffer(GL_FRAMEBUFFER, rt.fbo_);
 //                glViewport(0, 0, rt.width_, rt.height_);
 //                glEnable(GL_DEPTH_TEST);
@@ -432,29 +423,12 @@ int main(int, char **) {
 //                glClearDepth(1);
 //                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 //
-//                bunny_shader.use();
-//                bunny_shader.set_uniform("u_mvp", glm::value_ptr(mvp));
-//                bunny_shader.set_uniform("u_model", glm::value_ptr(model));
-//
-//                glm::vec3 light_dir = glm::rotateY(glm::vec3(1, 0, 0), glm::radians(time_from_start * 60));
-//
-//                bunny_shader.set_uniform<float>("u_color", 0.83, 0.64, 0.31);
-//                bunny_shader.set_uniform<float>("u_light", light_dir.x, light_dir.y, light_dir.z);
-//                bunny->draw();
-//
 //                glDisable(GL_DEPTH_TEST);
 //                glBindFramebuffer(GL_FRAMEBUFFER, 0);
-//            }
+            }
 
             // Render main
             {
-                auto model = glm::rotate<float>(glm::translate(translation),
-                                                rotation, //0.1 * (-1 + 2 * cos(time_from_start) * cos(time_from_start)),
-                                                glm::vec3(0, 1, 0)) * glm::scale(glm::vec3(100, 100, 100));
-                auto view = glm::lookAt<float>(eye, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
-                auto projection = glm::perspective<float>(90, float(display_w) / display_h, 0.1, 10000);
-                auto mvp = projection * view * model;
-
                 glViewport(0, 0, display_w, display_h);
 
                 glEnable(GL_CULL_FACE);
@@ -466,28 +440,20 @@ int main(int, char **) {
 
                 glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+                auto vp = player.draw(static_cast<float>(rt.width_), static_cast<float>(rt.height_));
+                auto terrain_model = glm::scale(glm::vec3(main_terrain->scale()));
+                auto mvp = vp * terrain_model;
+
                 terrain_shader.use();
                 terrain_shader.set_uniform("u_mvp", glm::value_ptr(mvp));
                 terrain_shader.set_uniform("u_tex", int(0));
 
-//                quad_shader.use();
-//                quad_shader.set_uniform("u_mvp", glm::value_ptr(mvp));
-//                quad_shader.set_uniform("u_tex", int(0));
-
-                if (wireframe) {
-                    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-                }
-
                 glActiveTexture(GL_TEXTURE0);
                 glBindTexture(GL_TEXTURE_2D_ARRAY, terrain_texture_array);
                 glBindVertexArray(vao);
-                glDrawElements(GL_TRIANGLES, elements, GL_UNSIGNED_INT, 0);
+                glDrawElements(GL_TRIANGLES, main_terrain->quads_count() * 2 * 3, GL_UNSIGNED_INT, 0);
                 glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
                 glBindVertexArray(0);
-
-                if (wireframe) {
-                    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-                }
             }
 
             // Generate gui render commands

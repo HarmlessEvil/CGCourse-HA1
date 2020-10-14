@@ -39,6 +39,12 @@ public:
 
     [[nodiscard]] bool has_normalized_coordinates() const;
 
+    [[nodiscard]] virtual glm::vec3 at(glm::vec2 const &position) const;
+
+    [[nodiscard]] float scale() const;
+
+    void set_scale(float scale);
+
 protected:
     const float height_ratio_;
     const float width_ratio_;
@@ -48,6 +54,8 @@ protected:
     void smooth_normals();
 
     void map_coordinates_to_texture_levels();
+
+    float scale_ = 1.0f;
 
 private:
     bool has_normalized_coordinates_ = false;

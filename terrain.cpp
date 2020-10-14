@@ -73,7 +73,7 @@ terrain::terrain(
                 }
             }
 
-            texture_coordinates_[i][j] = {j / 250.0f, i / 250.0f, 0.0f};
+            texture_coordinates_[i][j] = {j / 15.0f, i / 15.0f, 0.0f};
 
             glm::vec3 coordinate;
             if (has_normalized_coordinates_) {
@@ -233,4 +233,16 @@ void terrain::smooth_normals() {
             }
         }
     }
+}
+
+glm::vec3 terrain::at(glm::vec2 const &position) const {
+    return coordinates_[position.y][position.x] * scale_;
+}
+
+float terrain::scale() const {
+    return scale_;
+}
+
+void terrain::set_scale(float scale) {
+    scale_ = scale;
 }
