@@ -5,6 +5,7 @@
 #include "terrain.hpp"
 
 #include <cmath>
+#include <utility>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -13,13 +14,13 @@
 terrain::terrain(
         const image &height_map,
         bool normalize_coordinates,
-        std::function<float(glm::vec3 const &, glm::vec3 const &)> const &coordinate_to_texture_level_mapper
+        coordinate_to_texture_level_mapper_t coordinate_to_texture_level_mapper
 ) : terrain(
         height_map,
         height_map.width(),
         height_map.height(),
         normalize_coordinates,
-        coordinate_to_texture_level_mapper
+        std::move(coordinate_to_texture_level_mapper)
 ) {}
 
 terrain::terrain(
@@ -27,17 +28,14 @@ terrain::terrain(
         std::size_t width,
         std::size_t height,
         bool normalize_coordinates,
-        std::function<float(glm::vec3 const &, glm::vec3 const &)> const &coordinate_to_texture_level_mapper
-) : model(width, height) {
-    if (width <= 0 || height <= 0) {
-        throw std::invalid_argument("Width or height should be greater than 0");
-    }
-
-    const float height_ratio = static_cast<float>(height_map.height()) / height;
-    const float width_ratio = static_cast<float>(height_map.width()) / width;
-
+        coordinate_to_texture_level_mapper_t coordinate_to_texture_level_mapper
+) : rectangular_model(width, height),
+    has_normalized_coordinates_(normalize_coordinates),
+    height_ratio_(static_cast<float>(height_map.height()) / height),
+    width_ratio_(static_cast<float>(height_map.width()) / width),
+    coordinate_to_texture_level_mapper_(std::move(coordinate_to_texture_level_mapper)) {
     for (std::size_t i = 0; i < height; ++i) {
-        float index_i = i * height_ratio;
+        float index_i = i * height_ratio_;
 
         float prev_i_buffer;
         float height_shift = std::modf(index_i, &prev_i_buffer);
@@ -46,7 +44,7 @@ terrain::terrain(
         std::size_t next_i = std::min(prev_i + 1, height_map.height() - 1);
 
         for (std::size_t j = 0; j < width; ++j) {
-            float index_j = j * width_ratio;
+            float index_j = j * width_ratio_;
 
             float prev_j_buffer;
             float width_shift = std::modf(index_j, &prev_j_buffer);
@@ -65,21 +63,17 @@ terrain::terrain(
                     }
             };
 
-            if (normalize_coordinates) {
+            if (has_normalized_coordinates_) {
                 for (auto &item : nearest_heights) {
                     item[0] /= 255;
                     item[1] /= 255;
                 }
             }
 
-            texture_coordinates_[i][j] = glm::vec3{
-                    static_cast<float>(j) / 250,
-                    static_cast<float>(i) / 250,
-                    0
-            };
+            texture_coordinates_[i][j] = {j / 250.0f, i / 250.0f, 0.0f};
 
             glm::vec3 coordinate;
-            if (normalize_coordinates) {
+            if (has_normalized_coordinates_) {
                 coordinate = glm::vec3(static_cast<float>(j) / width, static_cast<float>(i) / height, 0);
             } else {
                 coordinate = glm::vec3(j, i, 0);
@@ -113,7 +107,7 @@ terrain::terrain(
 
             // Iterate over triangles of quad
             for (unsigned char shift = 0; shift < 2; ++shift) {
-                model::triangle_face triangle{};
+                rectangular_model::triangle_face triangle{};
                 glm::vec3 vertices[3] = {};
 
                 for (unsigned char vertex = 0; vertex < 3; ++vertex) {
@@ -207,10 +201,14 @@ terrain::terrain(
                 }
 
                 normals_[index.first][index.second] = sum_of_normals / count;
-                texture_coordinates_[index.first][index.second].z = coordinate_to_texture_level_mapper(
+                texture_coordinates_[index.first][index.second].z = coordinate_to_texture_level_mapper_(
                         coordinates_[index.first][index.second], normals_[index.first][index.second]
                 );
             }
         }
     }
+}
+
+bool terrain::has_normalized_coordinates() const {
+    return has_normalized_coordinates_;
 }

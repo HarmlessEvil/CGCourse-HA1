@@ -27,9 +27,9 @@ add_executable(opengl-imgui-sample
         bindings/imgui_impl_glfw.h
         bindings/imgui_impl_opengl3.h
         image.cpp
-        model.cpp
+        rectangular_model.cpp
         terrain.cpp
-        )
+        toric_terrain.cpp)
 
 install(DIRECTORY ${PROJECT_SOURCE_DIR}/assets DESTINATION ${PROJECT_BINARY_DIR})
 

@@ -2,8 +2,8 @@
 // Created by Александр Чори on 11.10.2020.
 //
 
-#ifndef OPENGL_IMGUI_SAMPLE_MODEL_HPP
-#define OPENGL_IMGUI_SAMPLE_MODEL_HPP
+#ifndef OPENGL_IMGUI_SAMPLE_RECTANGULAR_MODEL_HPP
+#define OPENGL_IMGUI_SAMPLE_RECTANGULAR_MODEL_HPP
 
 #include <array>
 #include <utility>
@@ -12,7 +12,7 @@
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
 
-class model {
+class rectangular_model {
 public:
     struct triangle_face {
         std::array<std::pair<std::size_t, std::size_t>, 3> indices;
@@ -21,7 +21,7 @@ public:
 
     using quad = std::array<triangle_face, 2>;
 
-    model(std::size_t width, std::size_t height);
+    rectangular_model(std::size_t width, std::size_t height);
 
     [[nodiscard]] const std::vector<std::vector<glm::vec3>> &coordinates() const;
 
@@ -47,4 +47,4 @@ protected:
     std::size_t height_;
 };
 
-#endif //OPENGL_IMGUI_SAMPLE_MODEL_HPP
+#endif //OPENGL_IMGUI_SAMPLE_RECTANGULAR_MODEL_HPP

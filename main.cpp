@@ -37,9 +37,10 @@
 #include "opengl_shader.h"
 
 #include "image.hpp"
-#include "model.hpp"
+#include "rectangular_model.hpp"
 #include "obj_model.h"
 #include "terrain.hpp"
+#include "toric_terrain.hpp"
 
 image load_image(std::string const &path, bool flip_vertically = true, int desired_channels = 0) {
     int width, height, channels;
@@ -291,7 +292,13 @@ GLuint create_terrain_texture_array(
 
 int main(int, char **) {
     image height_map = load_image("assets/textures/height_maps/mountain.png");
-    terrain terrain{height_map, 2000, 2000,true, texture_level_by_coordinate_and_normal};
+    toric_terrain toric_terrain{terrain{
+            height_map,
+            2000,
+            2000,
+            true,
+            texture_level_by_coordinate_and_normal
+    }, 5, 1};
 
     auto terrain_textures = load_terrain_texture_array(
             {
@@ -333,7 +340,7 @@ int main(int, char **) {
         render_target_t rt(512, 512);
 
         GLuint vbo, vao, ebo;
-        create_terrain(terrain, vbo, vao, ebo);
+        create_terrain(toric_terrain, vbo, vao, ebo);
 //        create_quad(vbo, vao, ebo);
 
         GLuint terrain_texture_array = create_terrain_texture_array(
@@ -392,7 +399,7 @@ int main(int, char **) {
                     "elements",
                     &elements,
                     0,
-                    static_cast<int>(terrain.quads_count() * 2 * 3) // 2 triangles, 3 vertices each in all quads
+                    static_cast<int>(toric_terrain.quads_count() * 2 * 3) // 2 triangles, 3 vertices each in all quads
             );
             //static float color[4] = { 1.0f,1.0f,1.0f,1.0f };
             //ImGui::ColorEdit3("color", color);
@@ -442,7 +449,7 @@ int main(int, char **) {
             {
                 auto model = glm::rotate<float>(glm::translate(translation),
                                                 rotation, //0.1 * (-1 + 2 * cos(time_from_start) * cos(time_from_start)),
-                                                glm::vec3(0, 1, 0)) * glm::scale(glm::vec3(1000, 1000, 255));
+                                                glm::vec3(0, 1, 0)) * glm::scale(glm::vec3(100, 100, 100));
                 auto view = glm::lookAt<float>(eye, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
                 auto projection = glm::perspective<float>(90, float(display_w) / display_h, 0.1, 1000);
                 auto mvp = projection * view * model;

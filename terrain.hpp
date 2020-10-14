@@ -10,14 +10,16 @@
 #include <glm/vec3.hpp>
 
 #include "image.hpp"
-#include "model.hpp"
+#include "rectangular_model.hpp"
 
-class terrain : public model {
+class terrain : public rectangular_model {
 public:
+    using coordinate_to_texture_level_mapper_t = std::function<float(glm::vec3 const &, glm::vec3 const &)>;
+
     explicit terrain(
             image const &height_map,
             bool normalize_coordinates = false,
-            std::function<float(glm::vec3 const &, glm::vec3 const &)> const &coordinate_to_texture_level_mapper = [](
+            coordinate_to_texture_level_mapper_t coordinate_to_texture_level_mapper = [](
                     glm::vec3 const &coordinate,
                     glm::vec3 const &normal
             ) {
@@ -30,8 +32,19 @@ public:
             std::size_t width,
             std::size_t height,
             bool normalize_coordinates,
-            std::function<float(glm::vec3 const &, glm::vec3 const &)> const &coordinate_to_texture_level_mapper
+            coordinate_to_texture_level_mapper_t coordinate_to_texture_level_mapper
     );
+
+    [[nodiscard]] bool has_normalized_coordinates() const;
+
+protected:
+    const float height_ratio_;
+    const float width_ratio_;
+
+    coordinate_to_texture_level_mapper_t coordinate_to_texture_level_mapper_;
+
+private:
+    bool has_normalized_coordinates_ = false;
 };
 
 
