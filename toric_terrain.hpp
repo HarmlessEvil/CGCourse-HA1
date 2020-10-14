@@ -9,7 +9,7 @@
 
 class toric_terrain : public terrain {
 public:
-    toric_terrain(terrain const &flat_terrain, std::size_t radius, std::size_t thickness);
+    toric_terrain(terrain const &flat_terrain, float radius, float thickness);
 };
 
 

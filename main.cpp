@@ -297,6 +297,7 @@ int main(int, char **) {
             2000,
             2000,
             true,
+            false,
             texture_level_by_coordinate_and_normal
     }, 5, 1};
 
@@ -451,7 +452,7 @@ int main(int, char **) {
                                                 rotation, //0.1 * (-1 + 2 * cos(time_from_start) * cos(time_from_start)),
                                                 glm::vec3(0, 1, 0)) * glm::scale(glm::vec3(100, 100, 100));
                 auto view = glm::lookAt<float>(eye, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
-                auto projection = glm::perspective<float>(90, float(display_w) / display_h, 0.1, 1000);
+                auto projection = glm::perspective<float>(90, float(display_w) / display_h, 0.1, 10000);
                 auto mvp = projection * view * model;
 
                 glViewport(0, 0, display_w, display_h);

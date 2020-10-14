@@ -19,6 +19,7 @@ public:
     explicit terrain(
             image const &height_map,
             bool normalize_coordinates = false,
+            bool smooth_normals = true,
             coordinate_to_texture_level_mapper_t coordinate_to_texture_level_mapper = [](
                     glm::vec3 const &coordinate,
                     glm::vec3 const &normal
@@ -32,6 +33,7 @@ public:
             std::size_t width,
             std::size_t height,
             bool normalize_coordinates,
+            bool smooth_normals,
             coordinate_to_texture_level_mapper_t coordinate_to_texture_level_mapper
     );
 
@@ -43,9 +45,12 @@ protected:
 
     coordinate_to_texture_level_mapper_t coordinate_to_texture_level_mapper_;
 
+    void smooth_normals();
+
+    void map_coordinates_to_texture_levels();
+
 private:
     bool has_normalized_coordinates_ = false;
 };
-
 
 #endif //OPENGL_IMGUI_SAMPLE_TERRAIN_HPP

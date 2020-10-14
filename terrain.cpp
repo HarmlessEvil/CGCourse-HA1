@@ -14,12 +14,14 @@
 terrain::terrain(
         const image &height_map,
         bool normalize_coordinates,
+        bool smooth_normals,
         coordinate_to_texture_level_mapper_t coordinate_to_texture_level_mapper
 ) : terrain(
         height_map,
         height_map.width(),
         height_map.height(),
         normalize_coordinates,
+        smooth_normals,
         std::move(coordinate_to_texture_level_mapper)
 ) {}
 
@@ -28,6 +30,7 @@ terrain::terrain(
         std::size_t width,
         std::size_t height,
         bool normalize_coordinates,
+        bool smooth_normals,
         coordinate_to_texture_level_mapper_t coordinate_to_texture_level_mapper
 ) : rectangular_model(width, height),
     has_normalized_coordinates_(normalize_coordinates),
@@ -130,7 +133,33 @@ terrain::terrain(
         }
     }
 
-    std::vector<std::vector<char>> used(height, std::vector<char>(width, false));
+    if (smooth_normals) {
+        this->smooth_normals();
+    }
+
+    map_coordinates_to_texture_levels();
+}
+
+void terrain::map_coordinates_to_texture_levels() {
+    for (auto &quad_row : quads_) {
+        for (auto &quad : quad_row) {
+            for (auto &triangle : quad) {
+                for (auto &index : triangle.indices) {
+                    texture_coordinates_[index.first][index.second].z = coordinate_to_texture_level_mapper_(
+                            coordinates_[index.first][index.second], normals_[index.first][index.second]
+                    );
+                }
+            }
+        }
+    }
+}
+
+bool terrain::has_normalized_coordinates() const {
+    return has_normalized_coordinates_;
+}
+
+void terrain::smooth_normals() {
+    std::vector<std::vector<char>> used(height_, std::vector<char>(width_, false));
     const glm::vec<2, char> quad_shifts[4][4] = {
             {
                     {-1, -1},
@@ -185,7 +214,7 @@ terrain::terrain(
                     long shift_i = i + quad_shifts[k][l].y;
                     long shift_j = j + quad_shifts[k][l].x;
 
-                    if (shift_i < 0 || shift_j < 0 || shift_i >= height - 1 || shift_j >= width - 1) {
+                    if (shift_i < 0 || shift_j < 0 || shift_i >= height_ - 1 || shift_j >= width_ - 1) {
                         continue;
                     }
 
@@ -201,14 +230,7 @@ terrain::terrain(
                 }
 
                 normals_[index.first][index.second] = sum_of_normals / count;
-                texture_coordinates_[index.first][index.second].z = coordinate_to_texture_level_mapper_(
-                        coordinates_[index.first][index.second], normals_[index.first][index.second]
-                );
             }
         }
     }
-}
-
-bool terrain::has_normalized_coordinates() const {
-    return has_normalized_coordinates_;
 }
