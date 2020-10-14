@@ -233,19 +233,7 @@ render_target_t::~render_target_t() {
 }
 
 float texture_level_by_coordinate_and_normal(glm::vec3 const &position, glm::vec3 const &normal) {
-    if (position.z < 0.25) {
-        return 0;
-    }
-
-    if (position.z < 0.5) {
-        return 1;
-    }
-
-    if (position.z < 0.75) {
-        return 2;
-    }
-
-    return 3;
+    return static_cast<float>(static_cast<int>(position.z / (1.0f / 5.0f)));
 }
 
 std::vector<image> load_terrain_texture_array(std::vector<std::string> const &paths) {
@@ -302,13 +290,14 @@ GLuint create_terrain_texture_array(
 }
 
 int main(int, char **) {
-    image height_map = load_image("assets/textures/height_maps/fjord.png");
-    terrain terrain{height_map, true, texture_level_by_coordinate_and_normal};
+    image height_map = load_image("assets/textures/height_maps/mountain.png");
+    terrain terrain{height_map, 2000, 2000,true, texture_level_by_coordinate_and_normal};
 
     auto terrain_textures = load_terrain_texture_array(
             {
                     "assets/textures/terrain/water.jpg",
                     "assets/textures/terrain/dirt.jpg",
+                    "assets/textures/terrain/grass.jpg",
                     "assets/textures/terrain/stone.jpg",
                     "assets/textures/terrain/snow.jpg"
             }
@@ -351,7 +340,7 @@ int main(int, char **) {
                 terrain_textures,
                 1024,
                 1024,
-                4
+                terrain_textures.size()
         );
 
         // init shader
