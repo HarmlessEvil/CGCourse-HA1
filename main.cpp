@@ -36,6 +36,7 @@
 
 #include "opengl_shader.h"
 
+#include "camera.hpp"
 #include "image.hpp"
 #include "rectangular_model.hpp"
 #include "obj_model.h"
@@ -330,6 +331,14 @@ int main(int, char **) {
         GLFWwindow *window = glfwCreateWindow(1280, 720, "Dear ImGui - Conan", NULL, NULL);
         if (window == NULL)
             throw std::runtime_error("Can't create glfw window");
+        std::shared_ptr<third_person_camera> camera = std::make_shared<third_person_camera>(
+                90,
+                0.1,
+                100,
+                1280.0 / 720.0,
+                glm::vec3(1.5, 1.8, 0)
+        );
+
 
         glfwMakeContextCurrent(window);
         glfwSwapInterval(1); // Enable vsync
@@ -358,8 +367,8 @@ int main(int, char **) {
                 "assets/shaders/terrain.fs.glsl"
         );
         shader_t bunny_shader("assets/shaders/model.vs", "assets/shaders/model.fs");
-        player player(bunny, bunny_shader, main_terrain);
-        player.set_position({750, 5});
+        player player(bunny, bunny_shader, main_terrain, camera);
+        player.set_position({1500, 5});
 
         // Setup GUI context
         IMGUI_CHECKVERSION();
@@ -371,13 +380,38 @@ int main(int, char **) {
 
         auto const start_time = std::chrono::steady_clock::now();
 
+        auto handle_inputs = [&io, &player]() {
+            if (!io.WantCaptureKeyboard) {
+                glm::vec2 direction{};
+
+                if (ImGui::IsKeyPressed('w') || ImGui::IsKeyPressed('W')) {
+                    direction.x = 1;
+                }
+                if (ImGui::IsKeyPressed('a') || ImGui::IsKeyPressed('A')) {
+                    direction.y = 1;
+                }
+                if (ImGui::IsKeyPressed('s') || ImGui::IsKeyPressed('S')) {
+                    direction.x = -1;
+                }
+                if (ImGui::IsKeyPressed('d') || ImGui::IsKeyPressed('D')) {
+                    direction.y = -1;
+                }
+
+                if (glm::length(direction) > 0) {
+                    player.move(glm::normalize(direction));
+                }
+            }
+        };
+
         while (!glfwWindowShouldClose(window)) {
             glfwPollEvents();
 
             // Get windows size
             int display_w, display_h;
             glfwGetFramebufferSize(window, &display_w, &display_h);
+            camera->set_aspect(static_cast<float>(display_w) / static_cast<float>(display_h));
 
+            handle_inputs();
 
             // Gui start new frame
             ImGui_ImplOpenGL3_NewFrame();
@@ -385,11 +419,11 @@ int main(int, char **) {
             ImGui::NewFrame();
 
             // GUI
-            ImGui::Begin("Triangle Position/Color");
+//            ImGui::Begin("Triangle Position/Color");
 //            static float rotation = 0.0;
 //            ImGui::SliderFloat("rotation", &rotation, 0, 2 * glm::pi<float>());
 //            static glm::vec3 translation = {0.0, 0.0, 0.0};
-            ImGui::SliderFloat3("camera_shift", glm::value_ptr(player.camera_shift_), -5, 5);
+//            ImGui::SliderFloat3("camera_shift", glm::value_ptr(player.camera_shift_), -5, 5);
 //            static glm::vec3 eye = {0, 0, -1};
 //            ImGui::SliderFloat3("eye", glm::value_ptr(eye), -1000.0f, 1000.0f);
 //            static bool wireframe = false;
@@ -403,7 +437,7 @@ int main(int, char **) {
 //            );
             //static float color[4] = { 1.0f,1.0f,1.0f,1.0f };
             //ImGui::ColorEdit3("color", color);
-            ImGui::End();
+//            ImGui::End();
 
             float const time_from_start = (float) (
                     std::chrono::duration<double, std::milli>(
@@ -440,9 +474,10 @@ int main(int, char **) {
 
                 glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-                auto vp = player.draw(static_cast<float>(rt.width_), static_cast<float>(rt.height_));
+                player.draw();
+
                 auto terrain_model = glm::scale(glm::vec3(main_terrain->scale()));
-                auto mvp = vp * terrain_model;
+                auto mvp = camera->get_vp() * terrain_model;
 
                 terrain_shader.use();
                 terrain_shader.set_uniform("u_mvp", glm::value_ptr(mvp));

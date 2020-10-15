@@ -30,7 +30,8 @@ add_executable(opengl-imgui-sample
         rectangular_model.cpp
         terrain.cpp
         toric_terrain.cpp
-        player.cpp)
+        player.cpp
+        camera.cpp)
 
 install(DIRECTORY ${PROJECT_SOURCE_DIR}/assets DESTINATION ${PROJECT_BINARY_DIR})
 
