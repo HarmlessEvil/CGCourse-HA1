@@ -62,9 +62,16 @@ void player::draw() {
     camera_->set_target(world_position);
     camera_->set_up(normal);
 
-    auto model = glm::translate(world_position)
-                 * glm::toMat4(rotation_between_vectors(glm::vec3(0, 1, 0), normal))
-                 * glm::scale(glm::vec3(7, 7, 7));
+    glm::vec2 camera_terrain_position = position_
+            - glm::rotate(glm::vec2(1, 0), angle_) * glm::vec2(camera_->shift().x, camera_->shift().y);
+    glm::vec3 camera_position = terrain_->at(camera_terrain_position);
+    camera_position += terrain_->normalAt(camera_terrain_position) * camera_->shift().z;
+    camera_->set_position(camera_position);
+
+    auto translation = glm::translate(world_position);
+    auto rotation_y = glm::rotate(angle_, glm::vec3(0, 1, 0));
+    auto rotation = glm::orientation(normal, glm::vec3(0, 1, 0));
+    auto model = translation * rotation * rotation_y * glm::scale(glm::mat4(1), glm::vec3(7, 7, 7));
     auto mvp = camera_->get_vp() * model;
 
     shader_.use();
@@ -77,22 +84,21 @@ void player::draw() {
     model_->draw();
 }
 
-void player::move(const glm::vec2 &direction) {
-    position_ += direction;
+void player::move(float speed, float angle) {
+    angle_ += glm::radians(angle);
 
-    if (position_.x >= terrain_->width()) {
-        position_.x -= terrain_->width();
-    } else if (position_.x < 0) {
-        position_.x += terrain_->width();
-    }
-
-    if (position_.y >= terrain_->height()) {
-        position_.y -= terrain_->height();
-    } else if (position_.y < 0) {
-        position_.y += terrain_->height();
-    }
+    glm::vec2 direction = glm::rotate(glm::vec2(1, 0), angle_);
+    position_ += direction * speed;
 }
 
 void player::set_position(const glm::vec2 &position) {
     position_ = position;
+}
+
+const glm::vec2 &player::position() const {
+    return position_;
+}
+
+glm::vec3 player::world_position() const {
+    return terrain_->at(position_);
 }

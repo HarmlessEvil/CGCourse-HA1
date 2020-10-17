@@ -25,9 +25,13 @@ public:
 
     void draw();
 
-    void move(glm::vec2 const &direction);
+    void move(float speed, float angle);
 
     void set_position(const glm::vec2 &position);
+
+    [[nodiscard]] const glm::vec2 &position() const;
+
+    [[nodiscard]] glm::vec3 world_position() const;
 
 private:
     std::shared_ptr<IObjModel> model_;
@@ -36,6 +40,8 @@ private:
 
     glm::vec2 position_{};
     std::shared_ptr<third_person_camera> camera_;
+
+    float angle_{};
 };
 
 

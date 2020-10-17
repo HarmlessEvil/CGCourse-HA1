@@ -331,12 +331,12 @@ int main(int, char **) {
         GLFWwindow *window = glfwCreateWindow(1280, 720, "Dear ImGui - Conan", NULL, NULL);
         if (window == NULL)
             throw std::runtime_error("Can't create glfw window");
-        std::shared_ptr<third_person_camera> camera = std::make_shared<third_person_camera>(
+        auto camera = std::make_shared<third_person_camera>(
                 90,
                 0.1,
                 100,
                 1280.0 / 720.0,
-                glm::vec3(1.5, 1.8, 0)
+                glm::vec3(1, 2, 2)
         );
 
 
@@ -368,7 +368,7 @@ int main(int, char **) {
         );
         shader_t bunny_shader("assets/shaders/model.vs", "assets/shaders/model.fs");
         player player(bunny, bunny_shader, main_terrain, camera);
-        player.set_position({1500, 5});
+        player.set_position({1500, 50});
 
         // Setup GUI context
         IMGUI_CHECKVERSION();
@@ -382,24 +382,31 @@ int main(int, char **) {
 
         auto handle_inputs = [&io, &player]() {
             if (!io.WantCaptureKeyboard) {
-                glm::vec2 direction{};
+                float speed{};
+                float angle{};
 
                 if (ImGui::IsKeyPressed('w') || ImGui::IsKeyPressed('W')) {
-                    direction.x = 1;
-                }
-                if (ImGui::IsKeyPressed('a') || ImGui::IsKeyPressed('A')) {
-                    direction.y = 1;
+                    speed += 1;
                 }
                 if (ImGui::IsKeyPressed('s') || ImGui::IsKeyPressed('S')) {
-                    direction.x = -1;
+                    speed -= 1;
+                }
+                if (ImGui::IsKeyPressed('a') || ImGui::IsKeyPressed('A')) {
+                    angle += 1;
                 }
                 if (ImGui::IsKeyPressed('d') || ImGui::IsKeyPressed('D')) {
-                    direction.y = -1;
+                    angle -= 1;
                 }
 
-                if (glm::length(direction) > 0) {
-                    player.move(glm::normalize(direction));
+                if (std::abs(speed) < 1e-6) {
+                    speed = 0;
                 }
+
+                if (std::abs(angle) < 1e-6) {
+                    angle = 0;
+                }
+
+                player.move(speed, angle);
             }
         };
 
@@ -423,7 +430,9 @@ int main(int, char **) {
 //            static float rotation = 0.0;
 //            ImGui::SliderFloat("rotation", &rotation, 0, 2 * glm::pi<float>());
 //            static glm::vec3 translation = {0.0, 0.0, 0.0};
-//            ImGui::SliderFloat3("camera_shift", glm::value_ptr(player.camera_shift_), -5, 5);
+//            ImGui::SliderFloat3("camera_shift", glm::value_ptr(camera->shift_), -100, 100);
+//            ImGui::Text("Position: %f, %f, %f", player.world_position().x, player.world_position().y, player.world_position().z);
+//            ImGui::Text("Camera position: %f, %f, %f", camera->position().x, camera->position().y, camera->position().z);
 //            static glm::vec3 eye = {0, 0, -1};
 //            ImGui::SliderFloat3("eye", glm::value_ptr(eye), -1000.0f, 1000.0f);
 //            static bool wireframe = false;

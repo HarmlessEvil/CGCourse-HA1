@@ -10,6 +10,10 @@
 class toric_terrain : public terrain {
 public:
     toric_terrain(terrain const &flat_terrain, float radius, float thickness);
+
+    [[nodiscard]] glm::vec3 at(const glm::vec2 &position) const override;
+
+    [[nodiscard]] glm::vec3 normalAt(const glm::vec2 &position) const override;
 };
 
 
