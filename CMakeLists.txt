@@ -31,7 +31,8 @@ add_executable(opengl-imgui-sample
         terrain.cpp
         toric_terrain.cpp
         player.cpp
-        camera.cpp)
+        camera.cpp
+        light_source.cpp)
 
 install(DIRECTORY ${PROJECT_SOURCE_DIR}/assets DESTINATION ${PROJECT_BINARY_DIR})
 

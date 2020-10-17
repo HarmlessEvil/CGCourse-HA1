@@ -10,6 +10,7 @@
 #include <glm/glm.hpp>
 
 #include "camera.hpp"
+#include "light_source.hpp"
 #include "obj_model.h"
 #include "opengl_shader.h"
 #include "terrain.hpp"
@@ -20,7 +21,9 @@ public:
             std::shared_ptr<IObjModel> model,
             const shader_t &shader,
             std::shared_ptr<terrain> terrain,
-            std::shared_ptr<third_person_camera> camera
+            std::shared_ptr<third_person_camera> camera,
+            std::shared_ptr<ambient_light> ambient,
+            std::shared_ptr<directional_light> sun
     );
 
     void draw();
@@ -42,6 +45,9 @@ private:
     std::shared_ptr<third_person_camera> camera_;
 
     float angle_{};
+
+    std::shared_ptr<ambient_light> ambient_;
+    std::shared_ptr<directional_light> sun_;
 };
 
 

@@ -9,17 +9,23 @@ struct vx_output_t
 
 in vx_output_t v_out;
 
-uniform vec3 u_color;
-uniform vec3 u_light;
+uniform vec3 u_ambient_color;
+uniform float u_ambient_intensity;
+
+uniform vec3 u_directional_light_color;
+uniform vec3 u_directional_light_direction;
 
 void main()
 {
   vec3 vec_x = dFdx(v_out.position_world);
   vec3 vec_y = dFdy(v_out.position_world);
 
+  vec3 ambient = u_ambient_intensity * u_ambient_color;
+
   vec3 normal = normalize(cross(vec_x, vec_y));
+  vec3 directional_light_direction = normalize(-u_directional_light_direction);
+  float dot_val = 0.1 + 0.9 * clamp(dot(normal, u_directional_light_direction), 0, 1);
+  vec3 diffuse = u_directional_light_color * dot_val;
 
-  float dot_val = 0.1 + 0.9 * clamp(dot(normal, u_light), 0, 1);
-
-  o_frag_color = vec4(u_color * vec3(dot_val), 1);
+  o_frag_color = vec4(ambient + diffuse, 1);
 }

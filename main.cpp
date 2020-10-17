@@ -38,7 +38,7 @@
 
 #include "camera.hpp"
 #include "image.hpp"
-#include "rectangular_model.hpp"
+#include "light_source.hpp"
 #include "obj_model.h"
 #include "player.hpp"
 #include "terrain.hpp"
@@ -303,6 +303,11 @@ int main(int, char **) {
             texture_level_by_coordinate_and_normal
     }, 5, 1);
     main_terrain->set_scale(100);
+    auto ambient = std::make_shared<ambient_light>(glm::vec3(0.6), 0.1);
+    auto sun = std::make_shared<directional_light>(
+            glm::vec3(1, 1, 1),
+            glm::vec3(0.7, 0.7, 0.4)
+    );
 
     auto terrain_textures = load_terrain_texture_array(
             {
@@ -367,7 +372,7 @@ int main(int, char **) {
                 "assets/shaders/terrain.fs.glsl"
         );
         shader_t bunny_shader("assets/shaders/model.vs", "assets/shaders/model.fs");
-        player player(bunny, bunny_shader, main_terrain, camera);
+        player player(bunny, bunny_shader, main_terrain, camera, ambient, sun);
         player.set_position({1500, 50});
 
         // Setup GUI context
@@ -426,11 +431,11 @@ int main(int, char **) {
             ImGui::NewFrame();
 
             // GUI
-//            ImGui::Begin("Triangle Position/Color");
+            ImGui::Begin("Triangle Position/Color");
 //            static float rotation = 0.0;
 //            ImGui::SliderFloat("rotation", &rotation, 0, 2 * glm::pi<float>());
 //            static glm::vec3 translation = {0.0, 0.0, 0.0};
-//            ImGui::SliderFloat3("camera_shift", glm::value_ptr(camera->shift_), -100, 100);
+//            ImGui::SliderFloat3("Sun direction", glm::value_ptr(sun->direction_), -1000, 1000);
 //            ImGui::Text("Position: %f, %f, %f", player.world_position().x, player.world_position().y, player.world_position().z);
 //            ImGui::Text("Camera position: %f, %f, %f", camera->position().x, camera->position().y, camera->position().z);
 //            static glm::vec3 eye = {0, 0, -1};
@@ -445,8 +450,8 @@ int main(int, char **) {
 //                    static_cast<int>(toric_terrain.quads_count() * 2 * 3) // 2 triangles, 3 vertices each in all quads
 //            );
             //static float color[4] = { 1.0f,1.0f,1.0f,1.0f };
-            //ImGui::ColorEdit3("color", color);
-//            ImGui::End();
+//            ImGui::ColorEdit3("Ambient color", glm::value_ptr(ambient->color_));
+            ImGui::End();
 
             float const time_from_start = (float) (
                     std::chrono::duration<double, std::milli>(
@@ -491,6 +496,27 @@ int main(int, char **) {
                 terrain_shader.use();
                 terrain_shader.set_uniform("u_mvp", glm::value_ptr(mvp));
                 terrain_shader.set_uniform("u_tex", int(0));
+
+                terrain_shader.set_uniform(
+                        "u_ambient_color",
+                        ambient->color().x,
+                        ambient->color().y,
+                        ambient->color().z
+                );
+                terrain_shader.set_uniform("u_ambient_intensity", ambient->intensity());
+
+                terrain_shader.set_uniform<float>(
+                        "u_directional_light_color",
+                        sun->color().x,
+                        sun->color().y,
+                        sun->color().z
+                );
+                terrain_shader.set_uniform<float>(
+                        "u_directional_light_direction",
+                        sun->direction().x,
+                        sun->direction().y,
+                        sun->direction().z
+                );
 
                 glActiveTexture(GL_TEXTURE0);
                 glBindTexture(GL_TEXTURE_2D_ARRAY, terrain_texture_array);
