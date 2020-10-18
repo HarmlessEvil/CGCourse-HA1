@@ -99,3 +99,15 @@ std::vector<std::pair<std::string, std::shared_ptr<light_source>>> player::light
 
     return lights;
 }
+
+glm::mat4 player::model() const {
+    glm::vec3 world_position = terrain_->at(position_);
+    glm::vec3 normal = terrain_->normalAt(position_);
+
+    auto translation = glm::translate(world_position);
+    auto rotation_y = glm::rotate(angle_, glm::vec3(0, 1, 0));
+    auto rotation = glm::orientation(normal, glm::vec3(0, 1, 0));
+    auto model = translation * rotation * rotation_y * glm::scale(glm::mat4(1), glm::vec3(7, 7, 7));
+
+    return model;
+}

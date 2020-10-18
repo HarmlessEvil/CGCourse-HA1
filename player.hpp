@@ -42,6 +42,8 @@ public:
 
     [[nodiscard]] std::vector<std::pair<std::string, std::shared_ptr<light_source>>> light_casters() const;
 
+    [[nodiscard]] glm::mat4 model() const;
+
 private:
     std::shared_ptr<IObjModel> model_;
     shader_t shader_;

@@ -185,8 +185,9 @@ struct render_target_t {
 
     ~render_target_t();
 
-    GLuint fbo_;
-    GLuint color_, depth_;
+    GLuint fbo_{};
+    GLuint color_{};
+    GLuint depth_{};
     int width_, height_;
 };
 
@@ -194,39 +195,44 @@ render_target_t::render_target_t(int res_x, int res_y) {
     width_ = res_x;
     height_ = res_y;
 
-    glGenTextures(1, &color_);
-    glBindTexture(GL_TEXTURE_2D, color_);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, res_x, res_y, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
+//    glGenTextures(1, &color_);
+//    glBindTexture(GL_TEXTURE_2D, color_);
+//    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, res_x, res_y, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
 
     glGenTextures(1, &depth_);
     glBindTexture(GL_TEXTURE_2D, depth_);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, res_x, res_y, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE,
-                 nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+    glTexImage2D(
+            GL_TEXTURE_2D,
+            0,
+            GL_DEPTH_COMPONENT,
+            res_x,
+            res_y,
+            0,
+            GL_DEPTH_COMPONENT,
+            GL_FLOAT,
+            nullptr
+    );
 
     glBindTexture(GL_TEXTURE_2D, 0);
 
     glGenFramebuffers(1, &fbo_);
 
     glBindFramebuffer(GL_FRAMEBUFFER, fbo_);
-
-    glFramebufferTexture2D(GL_FRAMEBUFFER,
-                           GL_COLOR_ATTACHMENT0,
-                           GL_TEXTURE_2D,
-                           color_,
-                           0);
-
-    glFramebufferTexture2D(GL_FRAMEBUFFER,
-                           GL_DEPTH_ATTACHMENT,
-                           GL_TEXTURE_2D,
-                           depth_,
-                           0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depth_, 0);
+    glDrawBuffer(GL_NONE);
+    glReadBuffer(GL_NONE);
+//    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, color_, 0);
 
     GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
     if (status != GL_FRAMEBUFFER_COMPLETE)
         throw std::runtime_error("Framebuffer incomplete");
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
 }
 
 render_target_t::~render_target_t() {
@@ -292,6 +298,34 @@ GLuint create_terrain_texture_array(
     return texture;
 }
 
+unsigned int quadVAO = 0;
+unsigned int quadVBO;
+
+void render_quad() {
+    if (quadVAO == 0) {
+        float quadVertices[] = {
+                // positions        // texture Coords
+                -1.0f, 1.0f, 0.0f, 0.0f, 1.0f,
+                -1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
+                1.0f, 1.0f, 0.0f, 1.0f, 1.0f,
+                1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
+        };
+        // setup plane VAO
+        glGenVertexArrays(1, &quadVAO);
+        glGenBuffers(1, &quadVBO);
+        glBindVertexArray(quadVAO);
+        glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *) 0);
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *) (3 * sizeof(float)));
+    }
+    glBindVertexArray(quadVAO);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glBindVertexArray(0);
+}
+
 int main(int, char **) {
     image height_map = load_image("assets/textures/height_maps/mountain.png");
     std::shared_ptr<terrain> main_terrain = std::make_shared<toric_terrain>(terrain{
@@ -304,7 +338,7 @@ int main(int, char **) {
     }, 5, 1);
     main_terrain->set_scale(100);
     auto sun = std::make_shared<directional_light>(
-            glm::vec3(-0.2, -1.0, -0.3),
+            glm::vec3(-0.4, -0.8, 0.2),
             glm::vec3(0.05, 0.05, 0.05),
             glm::vec3(0.4, 0.4, 0.4),
             glm::vec3(0.5, 0.5, 0.5)
@@ -338,7 +372,7 @@ int main(int, char **) {
         if (window == NULL)
             throw std::runtime_error("Can't create glfw window");
         auto camera = std::make_shared<third_person_camera>(
-                90,
+                glm::radians(90.0),
                 0.1,
                 1000,
                 1280.0 / 720.0,
@@ -373,6 +407,15 @@ int main(int, char **) {
                 "assets/shaders/terrain.fs.glsl"
         );
         shader_t bunny_shader("assets/shaders/model.vs", "assets/shaders/model.fs");
+        shader_t depth_shader(
+                "assets/shaders/depth.vs.glsl",
+                "assets/shaders/depth.fs.glsl"
+        );
+        shader_t debug_quad_shader(
+                "assets/shaders/debug-quad.vs.glsl",
+                "assets/shaders/debug-quad.fs.glsl"
+        );
+
         player player(bunny, bunny_shader, main_terrain, camera, sun);
         player.set_position({1500, 50});
 
@@ -431,30 +474,28 @@ int main(int, char **) {
             ImGui_ImplGlfw_NewFrame();
             ImGui::NewFrame();
 
-            std::shared_ptr<point_light> flashlight = std::static_pointer_cast<point_light>(
-                    player.light_casters()[0].second
-            );
-
             // GUI
             ImGui::Begin("Triangle Position/Color");
 //            static int linear = 0;
 //            ImGui::SliderInt("Flashlight linear", &linear, 0, 100);
 //            static int quadratic = 2;
 //            ImGui::SliderInt("Flashlight quadratic", &quadratic, 0, 100);
-//            static float exponent = 10000;
-//            ImGui::SliderFloat("Flashlight quadratic exponent", &exponent, 100, 1000000);
 //            ImGui::Text("Flashlight position: %f, %f, %f", flashlight->position_.x, flashlight->position_.y, flashlight->position_.z);
 //            ImGui::Text("Player position: %f, %f, %f", main_terrain->at(player.position()).x, main_terrain->at(player.position()).y, main_terrain->at(player.position()).z);
 //            ImGui::Text("Distance: %f", glm::length(flashlight->position_ - main_terrain->at(player.position())));
 //            ImGui::Text("Quadratic: %lf", 0.0032 / std::pow(10, quadratic));
+//            static glm::vec3 eye = glm::vec3(-200, 400, -100);
+//            ImGui::SliderFloat3("eye", glm::value_ptr(eye), -1000, 1000);
+//            static glm::vec3 target;
+//            ImGui::SliderFloat3("target", glm::value_ptr(target), -1000, 1000);
 //            static glm::vec3 translation = {0.0, 0.0, 0.0};
 //            ImGui::SliderFloat3("Sun direction", glm::value_ptr(sun->direction_), -1000, 1000);
 //            ImGui::ColorEdit3("Position", const_cast<float *>(glm::value_ptr(glm::abs(glm::normalize(flashlight->position_)))));
 //            ImGui::Text("Camera position: %f, %f, %f", camera->position().x, camera->position().y, camera->position().z);
 //            static glm::vec3 eye = {0, 0, -1};
 //            ImGui::SliderFloat3("eye", glm::value_ptr(eye), -1000.0f, 1000.0f);
-//            static bool wireframe = false;
-//            ImGui::Checkbox("wireframe", &wireframe);
+            static bool framebuffer_contents = false;
+            ImGui::Checkbox("framebuffer contents", &framebuffer_contents);
 //            static int elements = 300;
 //            ImGui::SliderInt(
 //                    "elements",
@@ -471,21 +512,54 @@ int main(int, char **) {
                             std::chrono::steady_clock::now() - start_time).count() /
                     1000.0);
 
+            float near_plane = 0.1;
+            float far_plane = 2000;
             // Render offscreen
             {
-//                glBindFramebuffer(GL_FRAMEBUFFER, rt.fbo_);
-//                glViewport(0, 0, rt.width_, rt.height_);
-//                glEnable(GL_DEPTH_TEST);
-//                glColorMask(1, 1, 1, 1);
-//                glDepthMask(1);
-//                glDepthFunc(GL_LEQUAL);
-//
-//                glClearColor(0.3, 0.3, 0.3, 1);
-//                glClearDepth(1);
-//                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-//
-//                glDisable(GL_DEPTH_TEST);
-//                glBindFramebuffer(GL_FRAMEBUFFER, 0);
+                glm::mat4 light_projection = glm::ortho(
+                        -750.0f,
+                        750.0f,
+                        -750.0f,
+                        750.0f,
+                        near_plane,
+                        far_plane
+                );
+                glm::mat4 light_view = glm::lookAt(
+                        glm::vec3(-200, 600, -100),
+                        glm::vec3(),
+                        glm::vec3(0, 1, 0)
+                );
+                glm::mat4 light_space_matrix = light_projection * light_view;
+
+                glBindFramebuffer(GL_FRAMEBUFFER, rt.fbo_);
+                glViewport(0, 0, rt.width_, rt.height_);
+
+                glEnable(GL_DEPTH_TEST);
+                glCullFace(GL_FRONT);
+                glColorMask(1, 1, 1, 1);
+                glDepthMask(GL_TRUE);
+                glDepthFunc(GL_LEQUAL);
+
+                glClearDepth(1);
+                glClear(GL_DEPTH_BUFFER_BIT);
+
+                depth_shader.use();
+                depth_shader.set_uniform("u_light_space_matrix", glm::value_ptr(light_space_matrix));
+
+                auto terrain_model = glm::scale(glm::vec3(main_terrain->scale()));
+                depth_shader.set_uniform("u_model", glm::value_ptr(terrain_model));
+
+                glBindVertexArray(vao);
+                glDrawElements(GL_TRIANGLES, main_terrain->quads_count() * 2 * 3, GL_UNSIGNED_INT, 0);
+                glBindVertexArray(0);
+
+                auto player_model = player.model();
+                depth_shader.set_uniform("u_model", glm::value_ptr(player_model));
+                bunny->draw();
+
+                glCullFace(GL_BACK);
+                glDisable(GL_DEPTH_TEST);
+                glBindFramebuffer(GL_FRAMEBUFFER, 0);
             }
 
             // Render main
@@ -529,6 +603,18 @@ int main(int, char **) {
                 glDrawElements(GL_TRIANGLES, main_terrain->quads_count() * 2 * 3, GL_UNSIGNED_INT, 0);
                 glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
                 glBindVertexArray(0);
+            }
+
+            {
+                if (framebuffer_contents) {
+                    debug_quad_shader.use();
+                    debug_quad_shader.set_uniform<float>("near_plane", near_plane);
+                    debug_quad_shader.set_uniform<float>("far_plane", far_plane);
+                    debug_quad_shader.set_uniform("depth_map", int(0));
+                    glActiveTexture(GL_TEXTURE0);
+                    glBindTexture(GL_TEXTURE_2D, rt.depth_);
+                    render_quad();
+                }
             }
 
             // Generate gui render commands
