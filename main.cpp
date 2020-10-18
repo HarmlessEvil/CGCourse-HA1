@@ -303,10 +303,11 @@ int main(int, char **) {
             texture_level_by_coordinate_and_normal
     }, 5, 1);
     main_terrain->set_scale(100);
-    auto ambient = std::make_shared<ambient_light>(glm::vec3(0.6), 0.1);
     auto sun = std::make_shared<directional_light>(
-            glm::vec3(1, 1, 1),
-            glm::vec3(0.7, 0.7, 0.4)
+            glm::vec3(-0.2, -1.0, -0.3),
+            glm::vec3(0.05, 0.05, 0.05),
+            glm::vec3(0.4, 0.4, 0.4),
+            glm::vec3(0.5, 0.5, 0.5)
     );
 
     auto terrain_textures = load_terrain_texture_array(
@@ -339,7 +340,7 @@ int main(int, char **) {
         auto camera = std::make_shared<third_person_camera>(
                 90,
                 0.1,
-                100,
+                1000,
                 1280.0 / 720.0,
                 glm::vec3(1, 2, 2)
         );
@@ -372,7 +373,7 @@ int main(int, char **) {
                 "assets/shaders/terrain.fs.glsl"
         );
         shader_t bunny_shader("assets/shaders/model.vs", "assets/shaders/model.fs");
-        player player(bunny, bunny_shader, main_terrain, camera, ambient, sun);
+        player player(bunny, bunny_shader, main_terrain, camera, sun);
         player.set_position({1500, 50});
 
         // Setup GUI context
@@ -430,13 +431,25 @@ int main(int, char **) {
             ImGui_ImplGlfw_NewFrame();
             ImGui::NewFrame();
 
+            std::shared_ptr<point_light> flashlight = std::static_pointer_cast<point_light>(
+                    player.light_casters()[0].second
+            );
+
             // GUI
             ImGui::Begin("Triangle Position/Color");
-//            static float rotation = 0.0;
-//            ImGui::SliderFloat("rotation", &rotation, 0, 2 * glm::pi<float>());
+//            static int linear = 0;
+//            ImGui::SliderInt("Flashlight linear", &linear, 0, 100);
+//            static int quadratic = 2;
+//            ImGui::SliderInt("Flashlight quadratic", &quadratic, 0, 100);
+//            static float exponent = 10000;
+//            ImGui::SliderFloat("Flashlight quadratic exponent", &exponent, 100, 1000000);
+//            ImGui::Text("Flashlight position: %f, %f, %f", flashlight->position_.x, flashlight->position_.y, flashlight->position_.z);
+//            ImGui::Text("Player position: %f, %f, %f", main_terrain->at(player.position()).x, main_terrain->at(player.position()).y, main_terrain->at(player.position()).z);
+//            ImGui::Text("Distance: %f", glm::length(flashlight->position_ - main_terrain->at(player.position())));
+//            ImGui::Text("Quadratic: %lf", 0.0032 / std::pow(10, quadratic));
 //            static glm::vec3 translation = {0.0, 0.0, 0.0};
 //            ImGui::SliderFloat3("Sun direction", glm::value_ptr(sun->direction_), -1000, 1000);
-//            ImGui::Text("Position: %f, %f, %f", player.world_position().x, player.world_position().y, player.world_position().z);
+//            ImGui::ColorEdit3("Position", const_cast<float *>(glm::value_ptr(glm::abs(glm::normalize(flashlight->position_)))));
 //            ImGui::Text("Camera position: %f, %f, %f", camera->position().x, camera->position().y, camera->position().z);
 //            static glm::vec3 eye = {0, 0, -1};
 //            ImGui::SliderFloat3("eye", glm::value_ptr(eye), -1000.0f, 1000.0f);
@@ -494,29 +507,21 @@ int main(int, char **) {
                 auto mvp = camera->get_vp() * terrain_model;
 
                 terrain_shader.use();
+                terrain_shader.set_uniform("u_model", glm::value_ptr(terrain_model));
                 terrain_shader.set_uniform("u_mvp", glm::value_ptr(mvp));
                 terrain_shader.set_uniform("u_tex", int(0));
 
                 terrain_shader.set_uniform(
-                        "u_ambient_color",
-                        ambient->color().x,
-                        ambient->color().y,
-                        ambient->color().z
+                        "u_camera_position",
+                        camera->position().x,
+                        camera->position().y,
+                        camera->position().z
                 );
-                terrain_shader.set_uniform("u_ambient_intensity", ambient->intensity());
 
-                terrain_shader.set_uniform<float>(
-                        "u_directional_light_color",
-                        sun->color().x,
-                        sun->color().y,
-                        sun->color().z
-                );
-                terrain_shader.set_uniform<float>(
-                        "u_directional_light_direction",
-                        sun->direction().x,
-                        sun->direction().y,
-                        sun->direction().z
-                );
+                sun->to_shader(terrain_shader, "u_sun");
+                for (const auto &[name, light] : player.light_casters()) {
+                    light->to_shader(terrain_shader, name);
+                }
 
                 glActiveTexture(GL_TEXTURE0);
                 glBindTexture(GL_TEXTURE_2D_ARRAY, terrain_texture_array);

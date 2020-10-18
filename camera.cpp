@@ -46,11 +46,7 @@ void third_person_camera::set_target(const glm::vec3 &target) {
     target_ = target;
 }
 
-void third_person_camera::set_direction(const glm::vec3 &direction) {
-    direction_ = direction;
-}
-
-glm::vec3 third_person_camera::position() const {
+const glm::vec3 & third_person_camera::position() const {
     return position_;
 }
 

@@ -44,20 +44,15 @@ public:
 
     void set_target(const glm::vec3 &target);
 
-    void set_direction(const glm::vec3 &direction);
-
     void set_position(const glm::vec3 &position);
 
-    [[nodiscard]] glm::vec3 position() const;
+    [[nodiscard]] const glm::vec3 &position() const;
 
     [[nodiscard]] const glm::vec3 &shift() const;
 
 private:
     glm::vec3 position_{};
     glm::vec3 target_{};
-
-public:
-    glm::vec3 direction_{1, 0, 0};
     glm::vec3 shift_{};
 };
 

@@ -12,9 +12,10 @@ struct vx_output_t {
 out vx_output_t v_out;
 
 uniform mat4 u_mvp;
+uniform mat4 u_model;
 
 void main() {
-    v_out.position = in_position;
+    v_out.position = (u_model * vec4(in_position, 1.0)).xyz;
     v_out.normal = in_normal;
     v_out.texture_coordinates = in_texture_coordinates;
 

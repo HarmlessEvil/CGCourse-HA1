@@ -6,6 +6,9 @@
 #define OPENGL_IMGUI_SAMPLE_PLAYER_HPP
 
 #include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include <glm/glm.hpp>
 
@@ -22,7 +25,6 @@ public:
             const shader_t &shader,
             std::shared_ptr<terrain> terrain,
             std::shared_ptr<third_person_camera> camera,
-            std::shared_ptr<ambient_light> ambient,
             std::shared_ptr<directional_light> sun
     );
 
@@ -36,6 +38,10 @@ public:
 
     [[nodiscard]] glm::vec3 world_position() const;
 
+    [[nodiscard]] glm::vec2 direction() const;
+
+    [[nodiscard]] std::vector<std::pair<std::string, std::shared_ptr<light_source>>> light_casters() const;
+
 private:
     std::shared_ptr<IObjModel> model_;
     shader_t shader_;
@@ -46,8 +52,8 @@ private:
 
     float angle_{};
 
-    std::shared_ptr<ambient_light> ambient_;
     std::shared_ptr<directional_light> sun_;
+    std::shared_ptr<spotlight> flashlight_;
 };
 
 
