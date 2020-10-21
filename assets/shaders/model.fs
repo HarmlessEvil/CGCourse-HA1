@@ -48,13 +48,11 @@ uniform vec3 u_camera_position;
 uniform directional_light u_sun;
 uniform spotlight u_flashlight;
 
-uniform sampler2D u_direction_light_shadow_map;
+uniform sampler2DShadow u_direction_light_shadow_map;
 
 vec3 calculate_directional_light(directional_light light, vec3 normal, vec3 view_direction);
 vec3 calculate_point_light(point_light light, vec3 normal, vec3 position, vec3 view_direction);
 vec3 calculate_spotlight(spotlight light, vec3 normal, vec3 position, vec3 view_direction);
-
-float calculate_directional_light_shadow(vec4 position_in_directional_light_space);
 
 void main()
 {
@@ -67,6 +65,7 @@ void main()
   vec3 color = calculate_directional_light(u_sun, normal, view_direction);
   color += calculate_spotlight(u_flashlight, normal, v_out.position_world, view_direction);
 
+  color *= textureProj(u_direction_light_shadow_map, v_out.position_in_directional_light_space);
   o_frag_color = vec4(color, 1);
 }
 
@@ -82,8 +81,7 @@ vec3 calculate_directional_light(directional_light light, vec3 normal, vec3 view
     vec3 diffuse = light.diffuse * diffuse_intensity;
     vec3 specular = light.specular * specular_intensity;
 
-    float directional_light_shadow = calculate_directional_light_shadow(v_out.position_in_directional_light_space);
-    return ambient + (1.0 - directional_light_shadow) * (diffuse + specular);
+    return ambient + diffuse + specular;
 }
 
 vec3 calculate_point_light(point_light light, vec3 normal, vec3 position, vec3 view_direction) {
@@ -124,14 +122,4 @@ vec3 calculate_spotlight(spotlight light, vec3 normal, vec3 position, vec3 view_
     vec3 specular = light.specular * specular_intensity;
 
     return (ambient + diffuse + specular) * attenuation * intensity;
-}
-
-float calculate_directional_light_shadow(vec4 position_in_directional_light_space) {
-    vec3 projective_coordinates = position_in_directional_light_space.xyz / position_in_directional_light_space.w;
-    projective_coordinates = projective_coordinates * 0.5 + 0.5;
-
-    float closest_depth = texture(u_direction_light_shadow_map, projective_coordinates.xy).r;
-    float current_depth = projective_coordinates.z;
-
-    return current_depth > closest_depth ? 1 : 0;
 }
