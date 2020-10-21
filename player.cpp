@@ -17,7 +17,8 @@ player::player(
         const shader_t &shader,
         std::shared_ptr<terrain> terrain,
         std::shared_ptr<third_person_camera> camera,
-        std::shared_ptr<directional_light> sun
+        std::shared_ptr<directional_light> sun,
+        std::shared_ptr<std::vector<shadow>> shadow_casters
 ) : model_(std::move(model)),
     shader_(shader),
     terrain_(std::move(terrain)),
@@ -34,10 +35,12 @@ player::player(
             0.016,
             glm::cos(glm::radians(12.5)),
             glm::cos(glm::radians(17.5))
-    )) {
+    )),
+    shadow_casters_(std::move(shadow_casters)) {
 
 }
 
+// Requires shadow maps to be in texture unit 1
 void player::draw() {
     glm::vec3 world_position = terrain_->at(position_);
     glm::vec3 normal = terrain_->normalAt(position_);
@@ -61,13 +64,28 @@ void player::draw() {
     shader_.use();
     shader_.set_uniform("u_mvp", glm::value_ptr(mvp));
     shader_.set_uniform("u_model", glm::value_ptr(model));
+    shader_.set_uniform("u_direction_light_shadow_map", int(1));
+    shader_.set_uniform(
+            "u_directional_light_space",
+            glm::value_ptr(*(*shadow_casters_)[0].light_space_matrix())
+    );
 
     shader_.set_uniform("u_camera_position", camera_position.x, camera_position.y, camera_position.z);
 
     sun_->to_shader(shader_, "u_sun");
     flashlight_->to_shader(shader_, "u_flashlight");
 
+    for (std::size_t i = 0; i < shadow_casters_->size(); ++i) {
+        glActiveTexture(GL_TEXTURE1 + i);
+        glBindTexture(GL_TEXTURE_2D, (*shadow_casters_)[i].render_target()->depth_);
+    }
+
     model_->draw();
+
+    for (std::size_t i = 0; i < shadow_casters_->size(); ++i) {
+        glActiveTexture(GL_TEXTURE1 + i);
+        glBindTexture(GL_TEXTURE_2D, 0);
+    }
 }
 
 glm::vec2 player::direction() const {

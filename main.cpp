@@ -41,6 +41,8 @@
 #include "light_source.hpp"
 #include "obj_model.h"
 #include "player.hpp"
+#include "render_target.hpp"
+#include "shadow.hpp"
 #include "terrain.hpp"
 #include "toric_terrain.hpp"
 
@@ -178,67 +180,6 @@ void create_terrain(const std::shared_ptr<terrain> &terrain, GLuint &vbo, GLuint
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
     glBindVertexArray(0);
-}
-
-struct render_target_t {
-    render_target_t(int res_x, int res_y);
-
-    ~render_target_t();
-
-    GLuint fbo_{};
-    GLuint color_{};
-    GLuint depth_{};
-    int width_, height_;
-};
-
-render_target_t::render_target_t(int res_x, int res_y) {
-    width_ = res_x;
-    height_ = res_y;
-
-//    glGenTextures(1, &color_);
-//    glBindTexture(GL_TEXTURE_2D, color_);
-//    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, res_x, res_y, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
-
-    glGenTextures(1, &depth_);
-    glBindTexture(GL_TEXTURE_2D, depth_);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
-    glTexImage2D(
-            GL_TEXTURE_2D,
-            0,
-            GL_DEPTH_COMPONENT,
-            res_x,
-            res_y,
-            0,
-            GL_DEPTH_COMPONENT,
-            GL_FLOAT,
-            nullptr
-    );
-
-    glBindTexture(GL_TEXTURE_2D, 0);
-
-    glGenFramebuffers(1, &fbo_);
-
-    glBindFramebuffer(GL_FRAMEBUFFER, fbo_);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depth_, 0);
-    glDrawBuffer(GL_NONE);
-    glReadBuffer(GL_NONE);
-//    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, color_, 0);
-
-    GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-    if (status != GL_FRAMEBUFFER_COMPLETE)
-        throw std::runtime_error("Framebuffer incomplete");
-
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-}
-
-render_target_t::~render_target_t() {
-    glDeleteFramebuffers(1, &fbo_);
-    glDeleteTextures(1, &depth_);
-    glDeleteTextures(1, &color_);
 }
 
 float texture_level_by_coordinate_and_normal(glm::vec3 const &position, glm::vec3 const &normal) {
@@ -389,7 +330,28 @@ int main(int, char **) {
         glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
         auto bunny = create_model("assets/models/bunny.obj");
-        render_target_t rt(512, 512);
+        auto rt = std::make_shared<render_target_t>(512, 512);
+
+        float near_plane = 0.1;
+        float far_plane = 2000;
+
+        glm::mat4 light_projection = glm::ortho(
+                -750.0f,
+                750.0f,
+                -750.0f,
+                750.0f,
+                near_plane,
+                far_plane
+        );
+        glm::mat4 light_view = glm::lookAt(
+                glm::vec3(-200, 600, -100),
+                glm::vec3(),
+                glm::vec3(0, 1, 0)
+        );
+        auto light_space_matrix = std::make_shared<glm::mat4>(light_projection * light_view);
+
+        auto shadow_casters = std::make_shared<std::vector<shadow>>();
+        shadow_casters->emplace_back(rt, light_space_matrix);
 
         GLuint vbo, vao, ebo;
         create_terrain(main_terrain, vbo, vao, ebo);
@@ -416,7 +378,7 @@ int main(int, char **) {
                 "assets/shaders/debug-quad.fs.glsl"
         );
 
-        player player(bunny, bunny_shader, main_terrain, camera, sun);
+        player player(bunny, bunny_shader, main_terrain, camera, sun, shadow_casters);
         player.set_position({1500, 50});
 
         // Setup GUI context
@@ -512,27 +474,11 @@ int main(int, char **) {
                             std::chrono::steady_clock::now() - start_time).count() /
                     1000.0);
 
-            float near_plane = 0.1;
-            float far_plane = 2000;
-            // Render offscreen
-            {
-                glm::mat4 light_projection = glm::ortho(
-                        -750.0f,
-                        750.0f,
-                        -750.0f,
-                        750.0f,
-                        near_plane,
-                        far_plane
-                );
-                glm::mat4 light_view = glm::lookAt(
-                        glm::vec3(-200, 600, -100),
-                        glm::vec3(),
-                        glm::vec3(0, 1, 0)
-                );
-                glm::mat4 light_space_matrix = light_projection * light_view;
+            for (const auto &shadow_caster : *shadow_casters) {
+                auto render_target = shadow_caster.render_target();
 
-                glBindFramebuffer(GL_FRAMEBUFFER, rt.fbo_);
-                glViewport(0, 0, rt.width_, rt.height_);
+                glBindFramebuffer(GL_FRAMEBUFFER, render_target->fbo_);
+                glViewport(0, 0, render_target->width_, render_target->height_);
 
                 glEnable(GL_DEPTH_TEST);
                 glCullFace(GL_FRONT);
@@ -544,7 +490,11 @@ int main(int, char **) {
                 glClear(GL_DEPTH_BUFFER_BIT);
 
                 depth_shader.use();
-                depth_shader.set_uniform("u_light_space_matrix", glm::value_ptr(light_space_matrix));
+                depth_shader.set_uniform("u_light_space_matrix", glm::value_ptr(*light_space_matrix));
+
+                auto player_model = player.model();
+                depth_shader.set_uniform("u_model", glm::value_ptr(player_model));
+                bunny->draw();
 
                 auto terrain_model = glm::scale(glm::vec3(main_terrain->scale()));
                 depth_shader.set_uniform("u_model", glm::value_ptr(terrain_model));
@@ -552,10 +502,6 @@ int main(int, char **) {
                 glBindVertexArray(vao);
                 glDrawElements(GL_TRIANGLES, main_terrain->quads_count() * 2 * 3, GL_UNSIGNED_INT, 0);
                 glBindVertexArray(0);
-
-                auto player_model = player.model();
-                depth_shader.set_uniform("u_model", glm::value_ptr(player_model));
-                bunny->draw();
 
                 glCullFace(GL_BACK);
                 glDisable(GL_DEPTH_TEST);
@@ -583,7 +529,9 @@ int main(int, char **) {
                 terrain_shader.use();
                 terrain_shader.set_uniform("u_model", glm::value_ptr(terrain_model));
                 terrain_shader.set_uniform("u_mvp", glm::value_ptr(mvp));
+                terrain_shader.set_uniform("u_directional_light_space", glm::value_ptr(*light_space_matrix));
                 terrain_shader.set_uniform("u_tex", int(0));
+                terrain_shader.set_uniform("u_direction_light_shadow_map", int(1));
 
                 terrain_shader.set_uniform(
                         "u_camera_position",
@@ -599,9 +547,20 @@ int main(int, char **) {
 
                 glActiveTexture(GL_TEXTURE0);
                 glBindTexture(GL_TEXTURE_2D_ARRAY, terrain_texture_array);
+
+                for (std::size_t i = 0; i < shadow_casters->size(); ++i) {
+                    glActiveTexture(GL_TEXTURE1 + i);
+                    glBindTexture(GL_TEXTURE_2D, (*shadow_casters)[i].render_target()->depth_);
+                }
+
                 glBindVertexArray(vao);
                 glDrawElements(GL_TRIANGLES, main_terrain->quads_count() * 2 * 3, GL_UNSIGNED_INT, 0);
+
                 glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
+                for (std::size_t i = 0; i < shadow_casters->size(); ++i) {
+                    glActiveTexture(GL_TEXTURE1 + i);
+                    glBindTexture(GL_TEXTURE_2D, 0);
+                }
                 glBindVertexArray(0);
             }
 
@@ -612,7 +571,7 @@ int main(int, char **) {
                     debug_quad_shader.set_uniform<float>("far_plane", far_plane);
                     debug_quad_shader.set_uniform("depth_map", int(0));
                     glActiveTexture(GL_TEXTURE0);
-                    glBindTexture(GL_TEXTURE_2D, rt.depth_);
+                    glBindTexture(GL_TEXTURE_2D, rt->depth_);
                     render_quad();
                 }
             }

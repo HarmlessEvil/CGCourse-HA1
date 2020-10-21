@@ -16,6 +16,7 @@
 #include "light_source.hpp"
 #include "obj_model.h"
 #include "opengl_shader.h"
+#include "shadow.hpp"
 #include "terrain.hpp"
 
 class player {
@@ -25,7 +26,8 @@ public:
             const shader_t &shader,
             std::shared_ptr<terrain> terrain,
             std::shared_ptr<third_person_camera> camera,
-            std::shared_ptr<directional_light> sun
+            std::shared_ptr<directional_light> sun,
+            std::shared_ptr<std::vector<shadow>> shadow_casters
     );
 
     void draw();
@@ -56,6 +58,8 @@ private:
 
     std::shared_ptr<directional_light> sun_;
     std::shared_ptr<spotlight> flashlight_;
+
+    std::shared_ptr<std::vector<shadow>> shadow_casters_;
 };
 
 
