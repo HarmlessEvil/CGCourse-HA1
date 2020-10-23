@@ -496,8 +496,6 @@ int main(int, char **) {
                 depth_shader.set_uniform("u_model", glm::value_ptr(player_model));
                 bunny->draw();
 
-                glCullFace(GL_BACK);
-
                 auto terrain_model = glm::scale(glm::vec3(main_terrain->scale()));
                 depth_shader.set_uniform("u_model", glm::value_ptr(terrain_model));
 
@@ -505,6 +503,7 @@ int main(int, char **) {
                 glDrawElements(GL_TRIANGLES, main_terrain->quads_count() * 2 * 3, GL_UNSIGNED_INT, 0);
                 glBindVertexArray(0);
 
+                glCullFace(GL_BACK);
                 glDisable(GL_DEPTH_TEST);
                 glBindFramebuffer(GL_FRAMEBUFFER, 0);
             }

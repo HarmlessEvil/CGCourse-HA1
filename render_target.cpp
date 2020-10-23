@@ -36,8 +36,8 @@ render_target_t::render_target_t(int res_x, int res_y) {
     glBindTexture(GL_TEXTURE_2D, 0);
 
     glGenFramebuffers(1, &fbo_);
-
     glBindFramebuffer(GL_FRAMEBUFFER, fbo_);
+
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depth_, 0);
     glDrawBuffer(GL_NONE);
     glReadBuffer(GL_NONE);

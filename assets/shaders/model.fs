@@ -4,7 +4,7 @@ out vec4 o_frag_color;
 
 struct vx_output_t {
     vec3 position_world;
-    vec4 position_in_directional_light_space;
+    vec3 position_in_directional_light_space;
 };
 
 in vx_output_t v_out;
@@ -65,7 +65,6 @@ void main()
   vec3 color = calculate_directional_light(u_sun, normal, view_direction);
   color += calculate_spotlight(u_flashlight, normal, v_out.position_world, view_direction);
 
-  color *= textureProj(u_direction_light_shadow_map, v_out.position_in_directional_light_space);
   o_frag_color = vec4(color, 1);
 }
 
@@ -81,7 +80,8 @@ vec3 calculate_directional_light(directional_light light, vec3 normal, vec3 view
     vec3 diffuse = light.diffuse * diffuse_intensity;
     vec3 specular = light.specular * specular_intensity;
 
-    return ambient + diffuse + specular;
+    float shadow = texture(u_direction_light_shadow_map, v_out.position_in_directional_light_space);
+    return ambient + shadow * (diffuse + specular);
 }
 
 vec3 calculate_point_light(point_light light, vec3 normal, vec3 position, vec3 view_direction) {
