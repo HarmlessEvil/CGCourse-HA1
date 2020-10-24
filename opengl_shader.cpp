@@ -5,7 +5,10 @@
 #include <iostream>
 
 #include <fmt/format.h>
+
+#ifndef __WIN32
 #include <spdlog/spdlog.h>
+#endif
 
 namespace {
     std::string read_shader_code(const std::string &fname) {
@@ -17,7 +20,11 @@ namespace {
 }
 
 shader_t::shader_t(const std::string &vertex_code_fname, const std::string &fragment_code_fname) {
+#ifdef _WIN32
+    std::cout << "Creating shader, vertex: " << vertex_code_fname << ", fragment: " << fragment_code_fname << std::endl;
+#else
     spdlog::info("Creating shader, vertex: {}, fragment: {}", vertex_code_fname, fragment_code_fname);
+#endif
 
     const auto vertex_code = read_shader_code(vertex_code_fname);
     const auto fragment_code = read_shader_code(fragment_code_fname);
@@ -118,7 +125,7 @@ void shader_t::check_linking_error() {
 shader_t::shader_t(
         const std::string &vertex_code_fname,
         const std::string &fragment_code_fname,
-        const std::vector<std::string>& uniforms
+        const std::vector<std::string> &uniforms
 ) : shader_t(vertex_code_fname, fragment_code_fname) {
     for (const auto &uniform : uniforms) {
         uniforms_[uniform] = glGetUniformLocation(program_id_, uniform.c_str());

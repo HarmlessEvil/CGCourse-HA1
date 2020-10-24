@@ -9,7 +9,10 @@
 #include <vector>
 
 #include <fmt/format.h>
+
+#ifndef __WIN32
 #include <spdlog/spdlog.h>
+#endif
 
 #include <GL/glew.h>
 
@@ -336,8 +339,8 @@ int main(int, char **) {
     image height_map = load_image("assets/textures/height_maps/mountain.png");
     std::shared_ptr<terrain> main_terrain = std::make_shared<toric_terrain>(terrain{
             height_map,
-            2000,
-            2000,
+            1750,
+            1750,
             true,
             false,
             texture_level_by_coordinate_and_normal
@@ -715,7 +718,11 @@ int main(int, char **) {
         glfwTerminate();
     }
     catch (std::exception const &e) {
+#ifdef __WIN32
+        std::cout << e.what() << std::endl;
+#else
         spdlog::critical("{}", e.what());
+#endif
         return 1;
     }
 
