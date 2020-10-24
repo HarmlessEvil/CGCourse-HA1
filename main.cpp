@@ -276,7 +276,11 @@ void setup_shadow_casters(
         std::shared_ptr<std::vector<std::shared_ptr<shadow>>> &shadow_casters,
         const player &player
 ) {
+#ifdef ENABLE_CASCADE_SHADOWS
     const GLuint shadow_cascades = 3;
+#else
+    const GLuint shadow_cascades = 1;
+#endif
     const size_t render_target_resolution = 512;
 
     GLuint depth;
@@ -298,15 +302,17 @@ void setup_shadow_casters(
 
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
 
-    float border_color[] = {1.0f, 1.0f, 1.0f, 1.0f};
-    glTexParameterfv(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_BORDER_COLOR, border_color);
-
     for (GLuint i = 0; i < shadow_cascades; ++i) {
+#ifdef ENABLE_CASCADE_SHADOWS
         auto viewport_size = static_cast<float>(5 * pow(14, i));
+#else
+        auto viewport_size = 750.0f;
+#endif
+
         auto light_projection_matrix = glm::ortho(
                 -viewport_size,
                 viewport_size,
@@ -326,7 +332,7 @@ void setup_shadow_casters(
                         },
                         sun->direction(),
                         light_projection_matrix,
-                        viewport_size / 2,
+                        viewport_size * 1.2,
                         [&player]() { return player.world_position(); }
                 )
         );
@@ -420,8 +426,6 @@ int main(int, char **) {
                         "u_light_space_matrices[0]",
                         "u_light_space_matrices[1]",
                         "u_light_space_matrices[2]",
-                        "u_light_space_matrices[3]",
-                        "u_light_space_matrices[4]",
                         "u_directional_light_shadow_map",
                         "u_tex",
                         "u_camera_position",
@@ -450,8 +454,6 @@ int main(int, char **) {
                         "u_light_space_matrices[0]",
                         "u_light_space_matrices[1]",
                         "u_light_space_matrices[2]",
-                        "u_light_space_matrices[3]",
-                        "u_light_space_matrices[4]",
                         "u_directional_light_shadow_map",
                         "u_camera_position",
                         "u_sun.direction",
@@ -645,18 +647,12 @@ int main(int, char **) {
                 terrain_shader.set_uniform("u_model", glm::value_ptr(terrain_model));
                 terrain_shader.set_uniform("u_mvp", glm::value_ptr(camera->get_vp() * terrain_model));
 
-                terrain_shader.set_uniform(
-                        "u_light_space_matrices[0]",
-                        glm::value_ptr((*shadow_casters)[0]->light_space_matrix())
-                );
-//                terrain_shader.set_uniform(
-//                        "u_light_space_matrices[1]",
-//                        glm::value_ptr((*shadow_casters)[1]->light_space_matrix())
-//                );
-//                terrain_shader.set_uniform(
-//                        "u_light_space_matrices[2]",
-//                        glm::value_ptr((*shadow_casters)[2]->light_space_matrix())
-//                );
+                for (std::size_t i = 0; i < shadow_casters->size(); ++i) {
+                    terrain_shader.set_uniform(
+                            fmt::format("u_light_space_matrices[{}]", i),
+                            glm::value_ptr((*shadow_casters)[i]->light_space_matrix())
+                    );
+                }
 
                 terrain_shader.set_uniform("u_tex", int(0));
                 terrain_shader.set_uniform("u_directional_light_shadow_map", int(1));
@@ -692,7 +688,11 @@ int main(int, char **) {
                     debug_quad_shader.set_uniform<float>("near_plane", 0.1);
                     debug_quad_shader.set_uniform<float>("far_plane", 200);
                     debug_quad_shader.set_uniform("depth_map", int(0));
+#ifdef ENABLE_CASCADE_SHADOWS
                     debug_quad_shader.set_uniform("index", static_cast<float>(framebuffer_layer_index));
+#else
+                    debug_quad_shader.set_uniform("index", 0.0f);
+#endif
                     glActiveTexture(GL_TEXTURE0);
                     glBindTexture(GL_TEXTURE_2D_ARRAY, shadow_casters->front()->render_target().depth_);
                     render_quad();

@@ -14,6 +14,8 @@ find_package(stb CONFIG)
 find_package(tinyobjloader CONFIG)
 find_package(spdlog CONFIG)
 
+add_definitions(-DENABLE_CASCADE_SHADOWS)
+
 set(_src_root_path "${PROJECT_SOURCE_DIR}")
 
 add_executable(opengl-imgui-sample

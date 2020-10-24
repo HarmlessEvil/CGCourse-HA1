@@ -7,6 +7,7 @@
 #include <sstream>
 #include <utility>
 
+#include <fmt/format.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -47,18 +48,12 @@ void player::draw() {
     shader_.set_uniform("u_model", glm::value_ptr(model()));
     shader_.set_uniform("u_directional_light_shadow_map", int(1));
 
-    shader_.set_uniform(
-            "u_light_space_matrices[0]",
-            glm::value_ptr((*shadow_casters_)[0]->light_space_matrix())
-    );
-//    shader_.set_uniform(
-//            "u_light_space_matrices[1]",
-//            glm::value_ptr((*shadow_casters_)[1]->light_space_matrix())
-//    );
-//    shader_.set_uniform(
-//            "u_light_space_matrices[2]",
-//            glm::value_ptr((*shadow_casters_)[2]->light_space_matrix())
-//    );
+    for (std::size_t i = 0; i < shadow_casters_->size(); ++i) {
+        shader_.set_uniform(
+                fmt::format("u_light_space_matrices[{}]", i),
+                glm::value_ptr((*shadow_casters_)[i]->light_space_matrix())
+        );
+    }
 
     shader_.set_uniform("u_camera_position", camera_->position().x, camera_->position().y, camera_->position().z);
 

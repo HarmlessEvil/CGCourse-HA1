@@ -60,7 +60,7 @@ void main() {
     vec3 view_direction = normalize(u_camera_position - v_out.position);
 
     vec3 color = calculate_directional_light(u_sun, v_out.normal, view_direction);
-    color += calculate_spotlight(u_player_flashlight, v_out.normal, v_out.position, view_direction);
+//    color += calculate_spotlight(u_player_flashlight, v_out.normal, v_out.position, view_direction);
 
     o_frag_color = vec4(color, 1.0);
 }
