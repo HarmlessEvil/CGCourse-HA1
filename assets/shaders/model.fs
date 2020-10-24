@@ -2,9 +2,10 @@
 
 out vec4 o_frag_color;
 
-struct vx_output_t {
+struct vx_output_t
+{
     vec3 position_world;
-    vec3 position_in_directional_light_space;
+    vec4 shadow_coordinates;
 };
 
 in vx_output_t v_out;
@@ -48,7 +49,7 @@ uniform vec3 u_camera_position;
 uniform directional_light u_sun;
 uniform spotlight u_flashlight;
 
-uniform sampler2DShadow u_direction_light_shadow_map;
+uniform sampler2DArrayShadow u_directional_light_shadow_map;
 
 vec3 calculate_directional_light(directional_light light, vec3 normal, vec3 view_direction);
 vec3 calculate_point_light(point_light light, vec3 normal, vec3 position, vec3 view_direction);
@@ -80,7 +81,7 @@ vec3 calculate_directional_light(directional_light light, vec3 normal, vec3 view
     vec3 diffuse = light.diffuse * diffuse_intensity;
     vec3 specular = light.specular * specular_intensity;
 
-    float shadow = texture(u_direction_light_shadow_map, v_out.position_in_directional_light_space);
+    float shadow = texture(u_directional_light_shadow_map, v_out.shadow_coordinates);
     return ambient + shadow * (diffuse + specular);
 }
 

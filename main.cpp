@@ -4,6 +4,7 @@
 #include <chrono>
 #include <iostream>
 #include <memory>
+#include <sstream>
 #include <utility>
 #include <vector>
 
@@ -267,6 +268,70 @@ void render_quad() {
     glBindVertexArray(0);
 }
 
+void setup_shadow_casters(
+        const std::shared_ptr<directional_light> &sun,
+        std::shared_ptr<std::vector<std::shared_ptr<shadow>>> &shadow_casters,
+        const player &player
+) {
+    const GLuint shadow_cascades = 3;
+    const size_t render_target_resolution = 512;
+
+    GLuint depth;
+    glGenTextures(1, &depth);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, depth);
+
+    glTexImage3D(
+            GL_TEXTURE_2D_ARRAY,
+            0,
+            GL_DEPTH_COMPONENT,
+            render_target_resolution,
+            render_target_resolution,
+            shadow_cascades,
+            0,
+            GL_DEPTH_COMPONENT,
+            GL_FLOAT,
+            nullptr
+    );
+
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+
+    float border_color[] = {1.0f, 1.0f, 1.0f, 1.0f};
+    glTexParameterfv(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_BORDER_COLOR, border_color);
+
+    for (GLuint i = 0; i < shadow_cascades; ++i) {
+        auto viewport_size = static_cast<float>(5 * pow(14, i));
+        auto light_projection_matrix = glm::ortho(
+                -viewport_size,
+                viewport_size,
+                -viewport_size,
+                viewport_size,
+                0.1f,
+                1500.0f
+        );
+
+        shadow_casters->push_back(
+                std::make_shared<directional_light_shadow>(
+                        render_target_t{
+                                render_target_resolution,
+                                render_target_resolution,
+                                depth,
+                                i
+                        },
+                        sun->direction(),
+                        light_projection_matrix,
+                        viewport_size / 2,
+                        [&player]() { return player.world_position(); }
+                )
+        );
+    }
+
+    glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
+}
+
 int main(int, char **) {
     image height_map = load_image("assets/textures/height_maps/mountain.png");
     std::shared_ptr<terrain> main_terrain = std::make_shared<toric_terrain>(terrain{
@@ -330,28 +395,7 @@ int main(int, char **) {
         glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
         auto bunny = create_model("assets/models/bunny.obj");
-        auto rt = std::make_shared<render_target_t>(512, 512);
-
-        float near_plane = 0.1;
-        float far_plane = 2000;
-
-        glm::mat4 light_projection = glm::ortho(
-                -750.0f,
-                750.0f,
-                -750.0f,
-                750.0f,
-                near_plane,
-                far_plane
-        );
-        glm::mat4 light_view = glm::lookAt(
-                glm::vec3(-200, 600, -100),
-                glm::vec3(),
-                glm::vec3(0, 1, 0)
-        );
-        auto light_space_matrix = std::make_shared<glm::mat4>(light_projection * light_view);
-
-        auto shadow_casters = std::make_shared<std::vector<shadow>>();
-        shadow_casters->emplace_back(rt, light_space_matrix);
+        auto shadow_casters = std::make_shared<std::vector<std::shared_ptr<shadow>>>();
 
         GLuint vbo, vao, ebo;
         create_terrain(main_terrain, vbo, vao, ebo);
@@ -366,20 +410,86 @@ int main(int, char **) {
         // init shader
         shader_t terrain_shader(
                 "assets/shaders/terrain.vs.glsl",
-                "assets/shaders/terrain.fs.glsl"
+                "assets/shaders/terrain.fs.glsl",
+                {
+                        "u_mvp",
+                        "u_model",
+                        "u_light_space_matrices[0]",
+                        "u_light_space_matrices[1]",
+                        "u_light_space_matrices[2]",
+                        "u_light_space_matrices[3]",
+                        "u_light_space_matrices[4]",
+                        "u_directional_light_shadow_map",
+                        "u_tex",
+                        "u_camera_position",
+                        "u_sun.direction",
+                        "u_sun.ambient",
+                        "u_sun.diffuse",
+                        "u_sun.specular",
+                        "u_player_flashlight.position",
+                        "u_player_flashlight.direction",
+                        "u_player_flashlight.cut_off",
+                        "u_player_flashlight.outer_cut_off",
+                        "u_player_flashlight.constant",
+                        "u_player_flashlight.linear",
+                        "u_player_flashlight.quadratic",
+                        "u_player_flashlight.ambient",
+                        "u_player_flashlight.diffuse",
+                        "u_player_flashlight.specular"
+                }
         );
-        shader_t bunny_shader("assets/shaders/model.vs", "assets/shaders/model.fs");
+        shader_t bunny_shader(
+                "assets/shaders/model.vs",
+                "assets/shaders/model.fs",
+                {
+                        "u_mvp",
+                        "u_model",
+                        "u_light_space_matrices[0]",
+                        "u_light_space_matrices[1]",
+                        "u_light_space_matrices[2]",
+                        "u_light_space_matrices[3]",
+                        "u_light_space_matrices[4]",
+                        "u_directional_light_shadow_map",
+                        "u_camera_position",
+                        "u_sun.direction",
+                        "u_sun.ambient",
+                        "u_sun.diffuse",
+                        "u_sun.specular",
+                        "u_flashlight.position",
+                        "u_flashlight.direction",
+                        "u_flashlight.cut_off",
+                        "u_flashlight.outer_cut_off",
+                        "u_flashlight.constant",
+                        "u_flashlight.linear",
+                        "u_flashlight.quadratic",
+                        "u_flashlight.ambient",
+                        "u_flashlight.diffuse",
+                        "u_flashlight.specular"
+                }
+        );
         shader_t depth_shader(
                 "assets/shaders/depth.vs.glsl",
-                "assets/shaders/depth.fs.glsl"
+                "assets/shaders/depth.fs.glsl",
+                {
+                        "u_light_space_matrix",
+                        "u_model"
+                }
         );
         shader_t debug_quad_shader(
                 "assets/shaders/debug-quad.vs.glsl",
-                "assets/shaders/debug-quad.fs.glsl"
+                "assets/shaders/debug-quad.fs.glsl",
+                {
+                        "depth_map",
+                        "index",
+                        "near_plane",
+                        "far_plane"
+                }
         );
 
         player player(bunny, bunny_shader, main_terrain, camera, sun, shadow_casters);
         player.set_position({1500, 50});
+
+        setup_shadow_casters(sun, shadow_casters, player);
 
         // Setup GUI context
         IMGUI_CHECKVERSION();
@@ -388,8 +498,6 @@ int main(int, char **) {
         ImGui_ImplGlfw_InitForOpenGL(window, true);
         ImGui_ImplOpenGL3_Init(glsl_version);
         ImGui::StyleColorsDark();
-
-        auto const start_time = std::chrono::steady_clock::now();
 
         auto handle_inputs = [&io, &player]() {
             if (!io.WantCaptureKeyboard) {
@@ -446,18 +554,27 @@ int main(int, char **) {
 //            ImGui::Text("Player position: %f, %f, %f", main_terrain->at(player.position()).x, main_terrain->at(player.position()).y, main_terrain->at(player.position()).z);
 //            ImGui::Text("Distance: %f", glm::length(flashlight->position_ - main_terrain->at(player.position())));
 //            ImGui::Text("Quadratic: %lf", 0.0032 / std::pow(10, quadratic));
-//            static glm::vec3 eye = glm::vec3(-200, 400, -100);
-//            ImGui::SliderFloat3("eye", glm::value_ptr(eye), -1000, 1000);
+//            static float distance = 1;
+//            ImGui::SliderFloat("distance", &distance, 1, 1000);
+//            static float size = 750;
+//            ImGui::SliderFloat("size", &size, 1, 750);
 //            static glm::vec3 target;
 //            ImGui::SliderFloat3("target", glm::value_ptr(target), -1000, 1000);
 //            static glm::vec3 translation = {0.0, 0.0, 0.0};
 //            ImGui::SliderFloat3("Sun direction", glm::value_ptr(sun->direction_), -1000, 1000);
 //            ImGui::ColorEdit3("Position", const_cast<float *>(glm::value_ptr(glm::abs(glm::normalize(flashlight->position_)))));
 //            ImGui::Text("Camera position: %f, %f, %f", camera->position().x, camera->position().y, camera->position().z);
-//            static glm::vec3 eye = {0, 0, -1};
-//            ImGui::SliderFloat3("eye", glm::value_ptr(eye), -1000.0f, 1000.0f);
+//            static glm::vec3 distance = {0, 0, 0};
+//            ImGui::SliderFloat3("distance", glm::value_ptr(distance), -1000.0f, 1000.0f);
             static bool framebuffer_contents = false;
             ImGui::Checkbox("framebuffer contents", &framebuffer_contents);
+            static int framebuffer_layer_index = 0;
+            ImGui::SliderInt(
+                    "framebuffer layer index",
+                    &framebuffer_layer_index,
+                    0,
+                    static_cast<int>(shadow_casters->size() - 1)
+            );
 //            static int elements = 300;
 //            ImGui::SliderInt(
 //                    "elements",
@@ -469,16 +586,11 @@ int main(int, char **) {
 //            ImGui::ColorEdit3("Ambient color", glm::value_ptr(ambient->color_));
             ImGui::End();
 
-            float const time_from_start = (float) (
-                    std::chrono::duration<double, std::milli>(
-                            std::chrono::steady_clock::now() - start_time).count() /
-                    1000.0);
-
             for (const auto &shadow_caster : *shadow_casters) {
-                auto render_target = shadow_caster.render_target();
+                auto render_target = shadow_caster->render_target();
 
-                glBindFramebuffer(GL_FRAMEBUFFER, render_target->fbo_);
-                glViewport(0, 0, render_target->width_, render_target->height_);
+                glBindFramebuffer(GL_FRAMEBUFFER, render_target.fbo_);
+                glViewport(0, 0, render_target.width_, render_target.height_);
 
                 glEnable(GL_DEPTH_TEST);
                 glCullFace(GL_FRONT);
@@ -490,14 +602,15 @@ int main(int, char **) {
                 glClear(GL_DEPTH_BUFFER_BIT);
 
                 depth_shader.use();
-                depth_shader.set_uniform("u_light_space_matrix", glm::value_ptr(*light_space_matrix));
+                depth_shader.set_uniform(
+                        "u_light_space_matrix",
+                        glm::value_ptr(shadow_caster->light_space_matrix())
+                );
 
-                auto player_model = player.model();
-                depth_shader.set_uniform("u_model", glm::value_ptr(player_model));
+                depth_shader.set_uniform("u_model", glm::value_ptr(player.model()));
                 bunny->draw();
 
-                auto terrain_model = glm::scale(glm::vec3(main_terrain->scale()));
-                depth_shader.set_uniform("u_model", glm::value_ptr(terrain_model));
+                depth_shader.set_uniform("u_model", glm::value_ptr(glm::scale(glm::vec3(main_terrain->scale()))));
 
                 glBindVertexArray(vao);
                 glDrawElements(GL_TRIANGLES, main_terrain->quads_count() * 2 * 3, GL_UNSIGNED_INT, 0);
@@ -524,14 +637,26 @@ int main(int, char **) {
                 player.draw();
 
                 auto terrain_model = glm::scale(glm::vec3(main_terrain->scale()));
-                auto mvp = camera->get_vp() * terrain_model;
 
                 terrain_shader.use();
                 terrain_shader.set_uniform("u_model", glm::value_ptr(terrain_model));
-                terrain_shader.set_uniform("u_mvp", glm::value_ptr(mvp));
-                terrain_shader.set_uniform("u_directional_light_space", glm::value_ptr(*light_space_matrix));
+                terrain_shader.set_uniform("u_mvp", glm::value_ptr(camera->get_vp() * terrain_model));
+
+                terrain_shader.set_uniform(
+                        "u_light_space_matrices[0]",
+                        glm::value_ptr((*shadow_casters)[0]->light_space_matrix())
+                );
+//                terrain_shader.set_uniform(
+//                        "u_light_space_matrices[1]",
+//                        glm::value_ptr((*shadow_casters)[1]->light_space_matrix())
+//                );
+//                terrain_shader.set_uniform(
+//                        "u_light_space_matrices[2]",
+//                        glm::value_ptr((*shadow_casters)[2]->light_space_matrix())
+//                );
+
                 terrain_shader.set_uniform("u_tex", int(0));
-                terrain_shader.set_uniform("u_direction_light_shadow_map", int(1));
+                terrain_shader.set_uniform("u_directional_light_shadow_map", int(1));
 
                 terrain_shader.set_uniform(
                         "u_camera_position",
@@ -548,30 +673,25 @@ int main(int, char **) {
                 glActiveTexture(GL_TEXTURE0);
                 glBindTexture(GL_TEXTURE_2D_ARRAY, terrain_texture_array);
 
-                for (std::size_t i = 0; i < shadow_casters->size(); ++i) {
-                    glActiveTexture(GL_TEXTURE1 + i);
-                    glBindTexture(GL_TEXTURE_2D, (*shadow_casters)[i].render_target()->depth_);
-                }
+                glActiveTexture(GL_TEXTURE1);
+                glBindTexture(GL_TEXTURE_2D_ARRAY, shadow_casters->front()->render_target().depth_);
 
                 glBindVertexArray(vao);
                 glDrawElements(GL_TRIANGLES, main_terrain->quads_count() * 2 * 3, GL_UNSIGNED_INT, 0);
 
                 glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
-                for (std::size_t i = 0; i < shadow_casters->size(); ++i) {
-                    glActiveTexture(GL_TEXTURE1 + i);
-                    glBindTexture(GL_TEXTURE_2D, 0);
-                }
                 glBindVertexArray(0);
             }
 
             {
                 if (framebuffer_contents) {
                     debug_quad_shader.use();
-                    debug_quad_shader.set_uniform<float>("near_plane", near_plane);
-                    debug_quad_shader.set_uniform<float>("far_plane", far_plane);
+                    debug_quad_shader.set_uniform<float>("near_plane", 0.1);
+                    debug_quad_shader.set_uniform<float>("far_plane", 200);
                     debug_quad_shader.set_uniform("depth_map", int(0));
+                    debug_quad_shader.set_uniform("index", static_cast<float>(framebuffer_layer_index));
                     glActiveTexture(GL_TEXTURE0);
-                    glBindTexture(GL_TEXTURE_2D, rt->depth_);
+                    glBindTexture(GL_TEXTURE_2D_ARRAY, shadow_casters->front()->render_target().depth_);
                     render_quad();
                 }
             }

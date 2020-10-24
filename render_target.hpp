@@ -8,9 +8,9 @@
 #include <GL/glew.h>
 
 struct render_target_t {
-    render_target_t(int res_x, int res_y);
+    render_target_t(int res_x, int res_y, GLuint depth, GLuint layer);
 
-    ~render_target_t();
+    render_target_t(int res_x, int res_y);
 
     GLuint fbo_{};
     GLuint color_{};

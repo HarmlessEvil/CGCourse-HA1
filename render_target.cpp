@@ -49,8 +49,21 @@ render_target_t::render_target_t(int res_x, int res_y) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-render_target_t::~render_target_t() {
-    glDeleteFramebuffers(1, &fbo_);
-    glDeleteTextures(1, &depth_);
-    glDeleteTextures(1, &color_);
+render_target_t::render_target_t(int res_x, int res_y, GLuint depth, GLuint layer) {
+    width_ = res_x;
+    height_ = res_y;
+    depth_ = depth;
+
+    glGenFramebuffers(1, &fbo_);
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo_);
+
+    glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, depth_, 0, layer);
+    glDrawBuffer(GL_NONE);
+    glReadBuffer(GL_NONE);
+
+    GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+    if (status != GL_FRAMEBUFFER_COMPLETE)
+        throw std::runtime_error("Framebuffer incomplete");
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }

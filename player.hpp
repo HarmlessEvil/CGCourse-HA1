@@ -27,7 +27,7 @@ public:
             std::shared_ptr<terrain> terrain,
             std::shared_ptr<third_person_camera> camera,
             std::shared_ptr<directional_light> sun,
-            std::shared_ptr<std::vector<shadow>> shadow_casters
+            std::shared_ptr<std::vector<std::shared_ptr<shadow>>> shadow_casters
     );
 
     void draw();
@@ -47,11 +47,17 @@ public:
     [[nodiscard]] glm::mat4 model() const;
 
 private:
+    void update();
+
+    glm::mat4 model_matrix_{};
+
     std::shared_ptr<IObjModel> model_;
     shader_t shader_;
     std::shared_ptr<terrain> terrain_;
 
     glm::vec2 position_{};
+    glm::vec3 world_position_{};
+    glm::vec3 normal_{};
     std::shared_ptr<third_person_camera> camera_;
 
     float angle_{};
@@ -59,7 +65,7 @@ private:
     std::shared_ptr<directional_light> sun_;
     std::shared_ptr<spotlight> flashlight_;
 
-    std::shared_ptr<std::vector<shadow>> shadow_casters_;
+    std::shared_ptr<std::vector<std::shared_ptr<shadow>>> shadow_casters_;
 };
 
 

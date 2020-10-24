@@ -6,7 +6,7 @@ struct vx_output_t {
     vec3 position;
     vec3 normal;
     vec3 texture_coordinates;
-    vec3 position_in_directional_light_space;
+    vec4 shadow_coordinates;
 };
 in vx_output_t v_out;
 
@@ -50,7 +50,7 @@ uniform directional_light u_sun;
 uniform spotlight u_player_flashlight;
 
 uniform sampler2DArray u_tex;
-uniform sampler2DShadow u_direction_light_shadow_map;
+uniform sampler2DArrayShadow u_directional_light_shadow_map;
 
 vec3 calculate_directional_light(directional_light light, vec3 normal, vec3 view_direction);
 vec3 calculate_point_light(point_light light, vec3 normal, vec3 position, vec3 view_direction);
@@ -78,7 +78,7 @@ vec3 calculate_directional_light(directional_light light, vec3 normal, vec3 view
     vec3 specular = light.specular * specular_intensity;
 
     vec3 texture_color = texture(u_tex, v_out.texture_coordinates).rgb;
-    float shadow = texture(u_direction_light_shadow_map, v_out.position_in_directional_light_space);
+    float shadow = texture(u_directional_light_shadow_map, v_out.shadow_coordinates);
     return (ambient + shadow * (diffuse + specular)) * texture_color;
 }
 

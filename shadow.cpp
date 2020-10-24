@@ -4,17 +4,36 @@
 
 #include "shadow.hpp"
 
+#include <exception>
 #include <utility>
 
-shadow::shadow(std::shared_ptr<render_target_t> render_target, std::shared_ptr<glm::mat4> light_space_matrix)
-        : render_target_(std::move(render_target)), light_space_matrix_(std::move(light_space_matrix)) {
+#include <glm/gtx/transform.hpp>
+
+shadow::shadow(const render_target_t &render_target) : render_target_(render_target) {
 
 }
 
-std::shared_ptr<render_target_t> shadow::render_target() const {
+const render_target_t &shadow::render_target() const {
     return render_target_;
 }
 
-std::shared_ptr<glm::mat4> shadow::light_space_matrix() const {
-    return light_space_matrix_;
+glm::mat4 directional_light_shadow::light_space_matrix() const {
+    auto target = fetch_target_position_();
+    glm::mat4 light_view = glm::lookAt(target - direction_ * distance_, target, glm::vec3(0, 1, 0));
+
+    return light_projection_ * light_view;
+}
+
+directional_light_shadow::directional_light_shadow(
+        const render_target_t &render_target,
+        const glm::vec3 &direction,
+        const glm::mat4 &light_projection,
+        float distance,
+        std::function<glm::vec3()> fetch_target_position
+) : shadow(render_target),
+    direction_(direction),
+    light_projection_(light_projection),
+    distance_(distance),
+    fetch_target_position_(std::move(fetch_target_position)) {
+
 }

@@ -4,6 +4,7 @@
 
 #include "player.hpp"
 
+#include <sstream>
 #include <utility>
 
 #include <glm/glm.hpp>
@@ -18,7 +19,7 @@ player::player(
         std::shared_ptr<terrain> terrain,
         std::shared_ptr<third_person_camera> camera,
         std::shared_ptr<directional_light> sun,
-        std::shared_ptr<std::vector<shadow>> shadow_casters
+        std::shared_ptr<std::vector<std::shared_ptr<shadow>>> shadow_casters
 ) : model_(std::move(model)),
     shader_(shader),
     terrain_(std::move(terrain)),
@@ -40,52 +41,36 @@ player::player(
 
 }
 
-// Requires shadow maps to be in texture unit 1
 void player::draw() {
-    glm::vec3 world_position = terrain_->at(position_);
-    glm::vec3 normal = terrain_->normalAt(position_);
-    camera_->set_target(world_position);
-    camera_->set_up(normal);
-
-    glm::vec2 camera_terrain_position = position_ - direction() * glm::vec2(camera_->shift().x, camera_->shift().y);
-    glm::vec3 camera_ground_position = terrain_->at(camera_terrain_position);
-    glm::vec3 camera_position = camera_ground_position + terrain_->normalAt(
-            camera_terrain_position
-    ) * camera_->shift().z;
-    camera_->set_position(camera_position);
-    flashlight_->set_direction(world_position - camera_ground_position);
-
-    auto translation = glm::translate(world_position);
-    auto rotation_y = glm::rotate(angle_, glm::vec3(0, 1, 0));
-    auto rotation = glm::orientation(normal, glm::vec3(0, 1, 0));
-    auto model = translation * rotation * rotation_y * glm::scale(glm::mat4(1), glm::vec3(7, 7, 7));
-    auto mvp = camera_->get_vp() * model;
-
     shader_.use();
-    shader_.set_uniform("u_mvp", glm::value_ptr(mvp));
-    shader_.set_uniform("u_model", glm::value_ptr(model));
-    shader_.set_uniform("u_direction_light_shadow_map", int(1));
-    shader_.set_uniform(
-            "u_directional_light_space",
-            glm::value_ptr(*(*shadow_casters_)[0].light_space_matrix())
-    );
+    shader_.set_uniform("u_mvp", glm::value_ptr(camera_->get_vp() * model()));
+    shader_.set_uniform("u_model", glm::value_ptr(model()));
+    shader_.set_uniform("u_directional_light_shadow_map", int(1));
 
-    shader_.set_uniform("u_camera_position", camera_position.x, camera_position.y, camera_position.z);
+    shader_.set_uniform(
+            "u_light_space_matrices[0]",
+            glm::value_ptr((*shadow_casters_)[0]->light_space_matrix())
+    );
+//    shader_.set_uniform(
+//            "u_light_space_matrices[1]",
+//            glm::value_ptr((*shadow_casters_)[1]->light_space_matrix())
+//    );
+//    shader_.set_uniform(
+//            "u_light_space_matrices[2]",
+//            glm::value_ptr((*shadow_casters_)[2]->light_space_matrix())
+//    );
+
+    shader_.set_uniform("u_camera_position", camera_->position().x, camera_->position().y, camera_->position().z);
 
     sun_->to_shader(shader_, "u_sun");
     flashlight_->to_shader(shader_, "u_flashlight");
 
-    for (std::size_t i = 0; i < shadow_casters_->size(); ++i) {
-        glActiveTexture(GL_TEXTURE1 + i);
-        glBindTexture(GL_TEXTURE_2D, (*shadow_casters_)[i].render_target()->depth_);
-    }
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, shadow_casters_->front()->render_target().depth_);
 
     model_->draw();
 
-    for (std::size_t i = 0; i < shadow_casters_->size(); ++i) {
-        glActiveTexture(GL_TEXTURE1 + i);
-        glBindTexture(GL_TEXTURE_2D, 0);
-    }
+    glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
 }
 
 glm::vec2 player::direction() const {
@@ -97,11 +82,15 @@ void player::move(float speed, float angle) {
 
     glm::vec2 direction = glm::rotate(glm::vec2(1, 0), angle_);
     set_position(position_ + direction * speed);
+
+    update();
 }
 
 void player::set_position(const glm::vec2 &position) {
     position_ = position;
     flashlight_->set_position(terrain_->at(position_));
+
+    update();
 }
 
 const glm::vec2 &player::position() const {
@@ -109,7 +98,7 @@ const glm::vec2 &player::position() const {
 }
 
 glm::vec3 player::world_position() const {
-    return terrain_->at(position_);
+    return world_position_;
 }
 
 std::vector<std::pair<std::string, std::shared_ptr<light_source>>> player::light_casters() const {
@@ -119,13 +108,27 @@ std::vector<std::pair<std::string, std::shared_ptr<light_source>>> player::light
 }
 
 glm::mat4 player::model() const {
-    glm::vec3 world_position = terrain_->at(position_);
-    glm::vec3 normal = terrain_->normalAt(position_);
+    return model_matrix_;
+}
 
-    auto translation = glm::translate(world_position);
+void player::update() {
+    world_position_ = terrain_->at(position_);
+    normal_ = terrain_->normalAt(position_);
+    camera_->set_target(world_position_);
+    camera_->set_up(normal_);
+
+    glm::vec2 camera_terrain_position = position_ - direction() * glm::vec2(camera_->shift().x, camera_->shift().y);
+    glm::vec3 camera_ground_position = terrain_->at(camera_terrain_position);
+    glm::vec3 camera_position = camera_ground_position + terrain_->normalAt(
+            camera_terrain_position
+    ) * camera_->shift().z;
+    camera_->set_position(camera_position);
+    flashlight_->set_direction(world_position_ - camera_ground_position);
+
+    auto translation = glm::translate(world_position_);
     auto rotation_y = glm::rotate(angle_, glm::vec3(0, 1, 0));
-    auto rotation = glm::orientation(normal, glm::vec3(0, 1, 0));
+    auto rotation = glm::orientation(normal_, glm::vec3(0, 1, 0));
     auto model = translation * rotation * rotation_y * glm::scale(glm::mat4(1), glm::vec3(7, 7, 7));
 
-    return model;
+    model_matrix_ = model;
 }
