@@ -11,6 +11,7 @@
 
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
+#include <glm/vec4.hpp>
 
 class rectangular_model {
 public:
@@ -41,10 +42,15 @@ protected:
     std::vector<std::vector<glm::vec3>> coordinates_;
     std::vector<std::vector<glm::vec3>> normals_;
     std::vector<std::vector<glm::vec3>> texture_coordinates_;
+    std::vector<std::vector<glm::vec4>> tangents_;
     std::vector<std::vector<quad>> quads_;
 
     std::size_t width_;
     std::size_t height_;
+
+    void smooth_normals();
+
+    void calculate_tangents();
 };
 
 #endif //OPENGL_IMGUI_SAMPLE_RECTANGULAR_MODEL_HPP

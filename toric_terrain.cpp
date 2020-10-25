@@ -6,7 +6,6 @@
 
 #include <cmath>
 
-#include <glm/glm.hpp>
 #include <glm/gtc/constants.hpp>
 
 toric_terrain::toric_terrain(const terrain &flat_terrain, float radius, float thickness)
@@ -75,61 +74,17 @@ toric_terrain::toric_terrain(const terrain &flat_terrain, float radius, float th
     }
 
     smooth_normals();
+    calculate_tangents();
 }
 
 glm::vec3 toric_terrain::at(const glm::vec2 &position) const {
-    float prev_i;
-    float i_shift = std::modf(position.x, &prev_i);
-    float next_i = prev_i + 1;
-
-    std::size_t int_prev_i = ((static_cast<long>(prev_i) % width_) + width_) % width_;
-    std::size_t int_next_i = ((static_cast<long>(next_i) % width_) + width_) % width_;
-
-    float prev_j;
-    float j_shift = std::modf(position.y, &prev_j);
-    float next_j = prev_j + 1;
-
-    std::size_t int_prev_j = ((static_cast<long>(prev_j) % height_) + height_) % height_;
-    std::size_t int_next_j = ((static_cast<long>(next_j) % height_) + height_) % height_;
-
-    auto upper_coordinates = glm::mix(
-            terrain::at(glm::vec2(int_prev_i, int_prev_j)),
-            terrain::at(glm::vec2(int_prev_i, int_next_j)),
-            j_shift
-    );
-    auto lower_coordinates = glm::mix(
-            terrain::at(glm::vec2(int_next_i, int_prev_j)),
-            terrain::at(glm::vec2(int_next_i, int_next_j)),
-            j_shift
-    );
-    auto res = glm::mix(upper_coordinates, lower_coordinates, i_shift);;
-    return res;
+    return get_with_interpolation([this](auto const &x) { return terrain::at(x); }, position);
 }
 
 glm::vec3 toric_terrain::normal_at(const glm::vec2 &position) const {
-    float prev_i;
-    float i_shift = std::modf(position.x, &prev_i);
-    float next_i = prev_i + 1;
+    return get_with_interpolation([this](auto const &x) { return terrain::normal_at(x); }, position);
+}
 
-    std::size_t int_prev_i = ((static_cast<long>(prev_i) % width_) + width_) % width_;
-    std::size_t int_next_i = ((static_cast<long>(next_i) % width_) + width_) % width_;
-
-    float prev_j;
-    float j_shift = std::modf(position.y, &prev_j);
-    float next_j = prev_j + 1;
-
-    std::size_t int_prev_j = ((static_cast<long>(prev_j) % height_) + height_) % height_;
-    std::size_t int_next_j = ((static_cast<long>(next_j) % height_) + height_) % height_;
-
-    auto upper_coordinates = glm::mix(
-            terrain::normal_at(glm::vec2(int_prev_i, int_prev_j)),
-            terrain::normal_at(glm::vec2(int_prev_i, int_next_j)),
-            j_shift
-    );
-    auto lower_coordinates = glm::mix(
-            terrain::normal_at(glm::vec2(int_next_i, int_prev_j)),
-            terrain::normal_at(glm::vec2(int_next_i, int_next_j)),
-            j_shift
-    );
-    return glm::mix(upper_coordinates, lower_coordinates, i_shift);;
+glm::vec3 toric_terrain::tangent_at(const glm::vec2 &position) const {
+    return get_with_interpolation([this](auto const &x) { return terrain::tangent_at(x); }, position);
 }

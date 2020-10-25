@@ -5,7 +5,6 @@
 #include "terrain.hpp"
 
 #include <cmath>
-#include <utility>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -135,6 +134,7 @@ terrain::terrain(
 
     if (smooth_normals) {
         this->smooth_normals();
+        calculate_tangents();
     }
 
     map_coordinates_to_texture_levels();
@@ -158,89 +158,16 @@ bool terrain::has_normalized_coordinates() const {
     return has_normalized_coordinates_;
 }
 
-void terrain::smooth_normals() {
-    std::vector<std::vector<char>> used(height_, std::vector<char>(width_, false));
-    const glm::vec<2, char> quad_shifts[4][4] = {
-            {
-                    {-1, -1},
-                    {0, -1},
-                    {-1, 0},
-                    {0, 0}
-            },
-            {
-                    {0,  -1},
-                    {1, -1},
-                    {0,  0},
-                    {1, 0}
-            },
-            {
-                    {-1, 0},
-                    {0, 0},
-                    {-1, 1},
-                    {0, 1}
-            },
-            {
-                    {0,  0},
-                    {1, 0},
-                    {0,  1},
-                    {1, 1}
-            }
-    };
-
-    for (long i = 0; i < quads_.size(); ++i) {
-        auto quads_row = quads_[i];
-
-        for (long j = 0; j < quads_row.size(); ++j) {
-            auto quad = quads_row[j];
-            std::pair<std::size_t, std::size_t> vertices[4] = {
-                    quad[0].indices[0],
-                    quad[0].indices[1],
-                    quad[0].indices[2],
-                    quad[1].indices[2]
-            };
-
-            for (unsigned char k = 0; k < 4; ++k) {
-                auto index = vertices[k];
-                if (used[index.first][index.second]) {
-                    continue;
-                }
-
-                used[index.first][index.second] = true;
-
-                glm::vec3 sum_of_normals{};
-                float count{};
-
-                for (unsigned char l = 0; l < 4; ++l) {
-                    long shift_i = i + quad_shifts[k][l].y;
-                    long shift_j = j + quad_shifts[k][l].x;
-
-                    if (shift_i < 0 || shift_j < 0 || shift_i >= height_ - 1 || shift_j >= width_ - 1) {
-                        continue;
-                    }
-
-                    auto current_quad = quads_[shift_i][shift_j];
-                    if (l != 0) {
-                        sum_of_normals += current_quad[0].normal;
-                        ++count;
-                    }
-                    if (l != 3) {
-                        sum_of_normals += current_quad[1].normal;
-                        ++count;
-                    }
-                }
-
-                normals_[index.first][index.second] = sum_of_normals / count;
-            }
-        }
-    }
-}
-
 glm::vec3 terrain::at(glm::vec2 const &position) const {
     return coordinates_[position.y][position.x] * scale_;
 }
 
 glm::vec3 terrain::normal_at(const glm::vec2 &position) const {
     return normals_[position.y][position.x];
+}
+
+glm::vec3 terrain::tangent_at(glm::vec2 const &position) const {
+    return tangents_[position.y][position.x];
 }
 
 float terrain::scale() const {

@@ -43,6 +43,8 @@ public:
 
     [[nodiscard]] virtual glm::vec3 normal_at(glm::vec2 const &position) const;
 
+    [[nodiscard]] virtual glm::vec3 tangent_at(glm::vec2 const &position) const;
+
     [[nodiscard]] float scale() const;
 
     void set_scale(float scale);
@@ -52,8 +54,6 @@ protected:
     const float width_ratio_;
 
     coordinate_to_texture_level_mapper_t coordinate_to_texture_level_mapper_;
-
-    void smooth_normals();
 
     void map_coordinates_to_texture_levels();
 
