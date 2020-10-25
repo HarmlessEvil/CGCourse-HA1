@@ -43,7 +43,7 @@ public:
 
     [[nodiscard]] virtual glm::vec3 normal_at(glm::vec2 const &position) const;
 
-    [[nodiscard]] virtual glm::vec3 tangent_at(glm::vec2 const &position) const;
+    [[nodiscard]] virtual glm::vec4 tangent_at(glm::vec2 const &position) const;
 
     [[nodiscard]] float scale() const;
 

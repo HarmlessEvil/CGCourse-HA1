@@ -166,7 +166,7 @@ glm::vec3 terrain::normal_at(const glm::vec2 &position) const {
     return normals_[position.y][position.x];
 }
 
-glm::vec3 terrain::tangent_at(glm::vec2 const &position) const {
+glm::vec4 terrain::tangent_at(glm::vec2 const &position) const {
     return tangents_[position.y][position.x];
 }
 

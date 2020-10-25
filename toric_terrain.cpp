@@ -85,6 +85,6 @@ glm::vec3 toric_terrain::normal_at(const glm::vec2 &position) const {
     return get_with_interpolation([this](auto const &x) { return terrain::normal_at(x); }, position);
 }
 
-glm::vec3 toric_terrain::tangent_at(const glm::vec2 &position) const {
+glm::vec4 toric_terrain::tangent_at(const glm::vec2 &position) const {
     return get_with_interpolation([this](auto const &x) { return terrain::tangent_at(x); }, position);
 }

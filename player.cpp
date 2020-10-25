@@ -120,9 +120,12 @@ void player::update() {
     camera_->set_position(camera_position);
     flashlight_->set_direction(world_position_ - camera_ground_position);
 
+    glm::vec4 const &tangent = terrain_->tangent_at(position_);
+    glm::vec3 bi_tangent = glm::cross(normal_, glm::vec3(tangent)) * tangent.w;
+
     auto translation = glm::translate(world_position_);
-    auto rotation_y = glm::rotate(angle_, glm::vec3(0, 1, 0));
-    auto rotation = glm::orientation(normal_, glm::vec3(0, 1, 0));
+    auto rotation = glm::mat4(glm::mat3(bi_tangent, normal_, glm::vec3(tangent)));
+    auto rotation_y = glm::rotate(angle_ + glm::radians(90.0f), glm::vec3(0, 1, 0));
     auto model = translation * rotation * rotation_y * glm::scale(glm::mat4(1), glm::vec3(7, 7, 7));
 
     model_matrix_ = model;

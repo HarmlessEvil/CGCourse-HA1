@@ -19,7 +19,7 @@ public:
 
     [[nodiscard]] glm::vec3 normal_at(const glm::vec2 &position) const override;
 
-    [[nodiscard]] glm::vec3 tangent_at(const glm::vec2 &position) const override;
+    [[nodiscard]] glm::vec4 tangent_at(const glm::vec2 &position) const override;
 
 private:
     template<typename F>
