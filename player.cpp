@@ -108,13 +108,13 @@ glm::mat4 player::model() const {
 
 void player::update() {
     world_position_ = terrain_->at(position_);
-    normal_ = terrain_->normalAt(position_);
+    normal_ = terrain_->normal_at(position_);
     camera_->set_target(world_position_);
     camera_->set_up(normal_);
 
     glm::vec2 camera_terrain_position = position_ - direction() * glm::vec2(camera_->shift().x, camera_->shift().y);
     glm::vec3 camera_ground_position = terrain_->at(camera_terrain_position);
-    glm::vec3 camera_position = camera_ground_position + terrain_->normalAt(
+    glm::vec3 camera_position = camera_ground_position + terrain_->normal_at(
             camera_terrain_position
     ) * camera_->shift().z;
     camera_->set_position(camera_position);

@@ -1,17 +1,16 @@
 #pragma optimize("", off)
 
-#include <algorithm>
-#include <chrono>
-#include <iostream>
 #include <memory>
-#include <sstream>
-#include <utility>
 #include <vector>
 
 #include <fmt/format.h>
 
 #ifndef __WIN32
+
 #include <spdlog/spdlog.h>
+
+#else
+#include <iostream>
 #endif
 
 #include <GL/glew.h>

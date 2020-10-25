@@ -239,7 +239,7 @@ glm::vec3 terrain::at(glm::vec2 const &position) const {
     return coordinates_[position.y][position.x] * scale_;
 }
 
-glm::vec3 terrain::normalAt(const glm::vec2 &position) const {
+glm::vec3 terrain::normal_at(const glm::vec2 &position) const {
     return normals_[position.y][position.x];
 }
 

@@ -41,7 +41,7 @@ public:
 
     [[nodiscard]] virtual glm::vec3 at(glm::vec2 const &position) const;
 
-    [[nodiscard]] virtual glm::vec3 normalAt(glm::vec2 const &position) const;
+    [[nodiscard]] virtual glm::vec3 normal_at(glm::vec2 const &position) const;
 
     [[nodiscard]] float scale() const;
 

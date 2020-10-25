@@ -13,7 +13,7 @@ public:
 
     [[nodiscard]] glm::vec3 at(const glm::vec2 &position) const override;
 
-    [[nodiscard]] glm::vec3 normalAt(const glm::vec2 &position) const override;
+    [[nodiscard]] glm::vec3 normal_at(const glm::vec2 &position) const override;
 };
 
 

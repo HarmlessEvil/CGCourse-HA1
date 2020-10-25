@@ -106,7 +106,7 @@ glm::vec3 toric_terrain::at(const glm::vec2 &position) const {
     return res;
 }
 
-glm::vec3 toric_terrain::normalAt(const glm::vec2 &position) const {
+glm::vec3 toric_terrain::normal_at(const glm::vec2 &position) const {
     float prev_i;
     float i_shift = std::modf(position.x, &prev_i);
     float next_i = prev_i + 1;
@@ -122,15 +122,14 @@ glm::vec3 toric_terrain::normalAt(const glm::vec2 &position) const {
     std::size_t int_next_j = ((static_cast<long>(next_j) % height_) + height_) % height_;
 
     auto upper_coordinates = glm::mix(
-            terrain::normalAt(glm::vec2(int_prev_i, int_prev_j)),
-            terrain::normalAt(glm::vec2(int_prev_i, int_next_j)),
+            terrain::normal_at(glm::vec2(int_prev_i, int_prev_j)),
+            terrain::normal_at(glm::vec2(int_prev_i, int_next_j)),
             j_shift
     );
     auto lower_coordinates = glm::mix(
-            terrain::normalAt(glm::vec2(int_next_i, int_prev_j)),
-            terrain::normalAt(glm::vec2(int_next_i, int_next_j)),
+            terrain::normal_at(glm::vec2(int_next_i, int_prev_j)),
+            terrain::normal_at(glm::vec2(int_next_i, int_next_j)),
             j_shift
     );
-    auto res = glm::mix(upper_coordinates, lower_coordinates, i_shift);;
-    return res;
+    return glm::mix(upper_coordinates, lower_coordinates, i_shift);;
 }
