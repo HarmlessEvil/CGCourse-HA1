@@ -4,6 +4,9 @@
 
 #include "camera.hpp"
 
+#include <algorithm>
+#include <iostream>
+
 #include <glm/gtx/rotate_vector.hpp>
 
 perspective_camera::perspective_camera(float fov, float z_near, float z_far, float ascpect)
@@ -38,20 +41,21 @@ third_person_camera::third_person_camera(float fov, float z_near, float z_far, f
 
 }
 
-glm::mat4 third_person_camera::get_vp() const {
-    return perspective_camera::get_vp(position_, target_);
+glm::mat4 third_person_camera::get_vp() {
+    return perspective_camera::get_vp(position(), target_);
 }
 
 void third_person_camera::set_target(const glm::vec3 &target) {
     target_ = target;
 }
 
-const glm::vec3 & third_person_camera::position() const {
-    return position_;
+glm::vec3 third_person_camera::position() {
+    current_position_ = glm::mix(current_position_, desired_position_, 0.002f);
+    return current_position_;
 }
 
 void third_person_camera::set_position(const glm::vec3 &position) {
-    position_ = position;
+    desired_position_ = position;
 }
 
 const glm::vec3 &third_person_camera::shift() const {

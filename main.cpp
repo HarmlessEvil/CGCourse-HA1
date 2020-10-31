@@ -525,16 +525,16 @@ int main(int, char **) {
                 float angle{};
 
                 if (ImGui::IsKeyPressed('w') || ImGui::IsKeyPressed('W')) {
-                    speed += 1;
+                    speed += 0.5;
                 }
                 if (ImGui::IsKeyPressed('s') || ImGui::IsKeyPressed('S')) {
-                    speed -= 1;
+                    speed -= 0.5;
                 }
                 if (ImGui::IsKeyPressed('a') || ImGui::IsKeyPressed('A')) {
-                    angle += 1;
+                    angle += 2;
                 }
                 if (ImGui::IsKeyPressed('d') || ImGui::IsKeyPressed('D')) {
-                    angle -= 1;
+                    angle -= 2;
                 }
 
                 if (std::abs(speed) < 1e-6) {
