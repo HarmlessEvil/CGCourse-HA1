@@ -317,7 +317,7 @@ void setup_shadow_casters(
                 viewport_size,
                 -viewport_size,
                 viewport_size,
-                0.1f,
+                0.5f,
                 1500.0f
         );
 
@@ -353,7 +353,7 @@ int main(int, char **) {
     main_terrain->set_scale(100);
     auto sun = std::make_shared<directional_light>(
             glm::vec3(-0.4, -0.8, 0.2),
-            glm::vec3(0.05, 0.05, 0.05),
+            glm::vec3(0.1, 0.1, 0.1),
             glm::vec3(0.4, 0.4, 0.4),
             glm::vec3(0.5, 0.5, 0.5)
     );
@@ -365,6 +365,15 @@ int main(int, char **) {
                     "assets/textures/terrain/grass.jpg",
                     "assets/textures/terrain/stone.jpg",
                     "assets/textures/terrain/snow.jpg"
+            }
+    );
+    auto terrain_detail_textures = load_terrain_texture_array(
+            {
+                    "assets/textures/terrain/water-detail.jpg",
+                    "assets/textures/terrain/dirt-detail.jpg",
+                    "assets/textures/terrain/grass-detail.jpg",
+                    "assets/textures/terrain/stone-detail.jpg",
+                    "assets/textures/terrain/snow-detail.jpg"
             }
     );
 
@@ -387,7 +396,7 @@ int main(int, char **) {
             throw std::runtime_error("Can't create glfw window");
         auto camera = std::make_shared<third_person_camera>(
                 glm::radians(90.0),
-                0.1,
+                0.5,
                 1000,
                 1280.0 / 720.0,
                 glm::vec3(1, 2, 2)
@@ -413,6 +422,12 @@ int main(int, char **) {
                 1024,
                 1024,
                 terrain_textures.size()
+        );
+        GLuint terrain_texture_detail_array = create_terrain_texture_array(
+                terrain_detail_textures,
+                1024,
+                1024,
+                terrain_detail_textures.size()
         );
 
         // init shader
@@ -654,7 +669,8 @@ int main(int, char **) {
                 }
 
                 terrain_shader.set_uniform("u_tex", int(0));
-                terrain_shader.set_uniform("u_directional_light_shadow_map", int(1));
+                terrain_shader.set_uniform("u_detail_tex", int(1));
+                terrain_shader.set_uniform("u_directional_light_shadow_map", int(2));
 
                 terrain_shader.set_uniform(
                         "u_camera_position",
@@ -669,22 +685,24 @@ int main(int, char **) {
                 }
 
                 glActiveTexture(GL_TEXTURE0);
-                glBindTexture(GL_TEXTURE_2D_ARRAY, terrain_texture_array);
+                glBindTexture(GL_TEXTURE_2D_ARRAY, terrain_texture_detail_array);
 
                 glActiveTexture(GL_TEXTURE1);
+                glBindTexture(GL_TEXTURE_2D_ARRAY, terrain_texture_array);
+
+                glActiveTexture(GL_TEXTURE2);
                 glBindTexture(GL_TEXTURE_2D_ARRAY, shadow_casters->front()->render_target().depth_);
 
                 glBindVertexArray(vao);
                 glDrawElements(GL_TRIANGLES, main_terrain->quads_count() * 2 * 3, GL_UNSIGNED_INT, 0);
 
-                glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
                 glBindVertexArray(0);
             }
 
             {
                 if (framebuffer_contents) {
                     debug_quad_shader.use();
-                    debug_quad_shader.set_uniform<float>("near_plane", 0.1);
+                    debug_quad_shader.set_uniform<float>("near_plane", 0.5);
                     debug_quad_shader.set_uniform<float>("far_plane", 200);
                     debug_quad_shader.set_uniform("depth_map", int(0));
 #ifdef ENABLE_CASCADE_SHADOWS

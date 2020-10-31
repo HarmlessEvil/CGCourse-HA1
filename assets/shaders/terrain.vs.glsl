@@ -9,6 +9,7 @@ struct vx_output_t {
     vec3 normal;
     vec3 texture_coordinates;
     vec4 shadow_coordinates;
+    vec4 screen_space_position;
 };
 out vx_output_t v_out;
 
@@ -44,5 +45,6 @@ void main() {
     v_out.texture_coordinates = in_texture_coordinates;
     v_out.shadow_coordinates = compute_shadow_coordinates();
 
-    gl_Position = u_mvp * vec4(in_position, 1.0);
+    v_out.screen_space_position = u_mvp * vec4(in_position, 1.0);
+    gl_Position = v_out.screen_space_position;
 }

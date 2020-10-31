@@ -46,7 +46,7 @@ void player::draw() {
     shader_.use();
     shader_.set_uniform("u_mvp", glm::value_ptr(camera_->get_vp() * model()));
     shader_.set_uniform("u_model", glm::value_ptr(model()));
-    shader_.set_uniform("u_directional_light_shadow_map", int(1));
+    shader_.set_uniform("u_directional_light_shadow_map", int(2));
 
     for (std::size_t i = 0; i < shadow_casters_->size(); ++i) {
         shader_.set_uniform(
@@ -60,7 +60,7 @@ void player::draw() {
     sun_->to_shader(shader_, "u_sun");
     flashlight_->to_shader(shader_, "u_flashlight");
 
-    glActiveTexture(GL_TEXTURE1);
+    glActiveTexture(GL_TEXTURE2);
     glBindTexture(GL_TEXTURE_2D_ARRAY, shadow_casters_->front()->render_target().depth_);
 
     model_->draw();

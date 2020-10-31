@@ -72,7 +72,7 @@ terrain::terrain(
                 }
             }
 
-            texture_coordinates_[i][j] = {j / 15.0f, i / 15.0f, 0.0f};
+            texture_coordinates_[i][j] = {j / 100.0f, i / 100.0f, 0.0f};
 
             glm::vec3 coordinate;
             if (has_normalized_coordinates_) {
