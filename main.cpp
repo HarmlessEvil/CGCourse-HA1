@@ -442,6 +442,7 @@ int main(int, char **) {
                         "u_light_space_matrices[2]",
                         "u_directional_light_shadow_map",
                         "u_tex",
+                        "u_detail_tex",
                         "u_camera_position",
                         "u_sun.direction",
                         "u_sun.ambient",
@@ -685,10 +686,10 @@ int main(int, char **) {
                 }
 
                 glActiveTexture(GL_TEXTURE0);
-                glBindTexture(GL_TEXTURE_2D_ARRAY, terrain_texture_detail_array);
+                glBindTexture(GL_TEXTURE_2D_ARRAY, terrain_texture_array);
 
                 glActiveTexture(GL_TEXTURE1);
-                glBindTexture(GL_TEXTURE_2D_ARRAY, terrain_texture_array);
+                glBindTexture(GL_TEXTURE_2D_ARRAY, terrain_texture_detail_array);
 
                 glActiveTexture(GL_TEXTURE2);
                 glBindTexture(GL_TEXTURE_2D_ARRAY, shadow_casters->front()->render_target().depth_);
