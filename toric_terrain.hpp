@@ -27,16 +27,18 @@ private:
         float prev_i;
         float i_shift = std::modf(position.x, &prev_i);
         float next_i = prev_i + 1;
+        long width_as_long = width_;
 
-        std::size_t int_prev_i = ((static_cast<long>(prev_i) % width_) + width_) % width_;
-        std::size_t int_next_i = ((static_cast<long>(next_i) % width_) + width_) % width_;
+        std::size_t int_prev_i = ((static_cast<long>(prev_i) % width_as_long) + width_as_long) % width_as_long;
+        std::size_t int_next_i = ((static_cast<long>(next_i) % width_as_long) + width_as_long) % width_as_long;
 
         float prev_j;
         float j_shift = std::modf(position.y, &prev_j);
         float next_j = prev_j + 1;
+        long height_as_long = height_;
 
-        std::size_t int_prev_j = ((static_cast<long>(prev_j) % height_) + height_) % height_;
-        std::size_t int_next_j = ((static_cast<long>(next_j) % height_) + height_) % height_;
+        std::size_t int_prev_j = ((static_cast<long>(prev_j) % height_as_long) + height_as_long) % height_as_long;
+        std::size_t int_next_j = ((static_cast<long>(next_j) % height_as_long) + height_as_long) % height_as_long;
 
         auto upper_coordinates = glm::mix(
                 get(glm::vec2(int_prev_i, int_prev_j)),

@@ -48,7 +48,9 @@ const std::vector<std::vector<glm::vec3>> &rectangular_model::normals() const {
 }
 
 void rectangular_model::smooth_normals() {
-    std::vector<std::vector<char>> used(height_, std::vector<char>(width_, false));
+    assert(!quads_.empty());
+
+    std::vector<std::vector<char>> used(quads_.size(), std::vector<char>(quads_[0].size(), false));
     const glm::vec<2, char> quad_shifts[4][4] = {
             {
                     {-1, -1},
@@ -103,7 +105,7 @@ void rectangular_model::smooth_normals() {
                     long shift_i = i + quad_shifts[k][l].y;
                     long shift_j = j + quad_shifts[k][l].x;
 
-                    if (shift_i < 0 || shift_j < 0 || shift_i >= height_ - 1 || shift_j >= width_ - 1) {
+                    if (shift_i < 0 || shift_j < 0 || shift_i >= quads_.size() - 1 || shift_j >= quads_row.size() - 1) {
                         continue;
                     }
 

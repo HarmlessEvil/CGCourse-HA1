@@ -39,13 +39,28 @@ toric_terrain::toric_terrain(const terrain &flat_terrain, float radius, float th
         quad[0].indices[1] = {i, 0};
         quad[0].indices[2] = {i + 1, width_ - 1};
 
+        auto &vertexNW = coordinates_[quad[0].indices[0].first][quad[0].indices[0].second];
+        auto &vertexSW = coordinates_[quad[0].indices[2].first][quad[0].indices[2].second];
+        auto averageW = (vertexNW + vertexSW) / 2.0f;
+
+        vertexNW = glm::mix(vertexNW, averageW, 0.99f);
+        vertexSW = glm::mix(vertexSW, averageW, 0.99f);
+
         quad[1].indices[0] = {i + 1, width_ - 1};
         quad[1].indices[1] = {i, 0};
         quad[1].indices[2] = {i + 1, 0};
 
+        auto &vertexNE = coordinates_[quad[1].indices[0].first][quad[1].indices[0].second];
+        auto &vertexSE = coordinates_[quad[1].indices[2].first][quad[1].indices[2].second];
+        auto averageE = (vertexNE + vertexSE) / 2.0f;
+
+        vertexNE = glm::mix(vertexNE, averageE, 0.99f);
+        vertexSE = glm::mix(vertexSE, averageE, 0.99f);
+
         quads_[i].push_back(quad);
     }
 
+    quads_.emplace_back();
     for (std::size_t i = 0; i < width_ - 1; ++i) {
         quad quad{};
 
@@ -53,11 +68,25 @@ toric_terrain::toric_terrain(const terrain &flat_terrain, float radius, float th
         quad[0].indices[1] = {height_ - 1, i + 1};
         quad[0].indices[2] = {0, i};
 
+        auto &vertexNW = coordinates_[quad[0].indices[0].first][quad[0].indices[0].second];
+        auto &vertexNE = coordinates_[quad[0].indices[2].first][quad[0].indices[2].second];
+        auto averageN = (vertexNE + vertexNW) / 2.0f;
+
+        vertexNW = glm::mix(vertexNW, averageN, 0.99f);
+        vertexNE = glm::mix(vertexNE, averageN, 0.99f);
+
         quad[1].indices[0] = {0, i};
         quad[1].indices[1] = {height_ - 1, i + 1};
         quad[1].indices[2] = {0, i + 1};
 
-        quads_[i].push_back(quad);
+        auto &vertexSW = coordinates_[quad[1].indices[0].first][quad[1].indices[0].second];
+        auto &vertexSE = coordinates_[quad[1].indices[2].first][quad[1].indices[2].second];
+        auto averageS = (vertexSE + vertexSW) / 2.0f;
+
+        vertexSW = glm::mix(vertexSW, averageS, 0.99f);
+        vertexSE = glm::mix(vertexSE, averageS, 0.99f);
+
+        quads_.back().push_back(quad);
     }
 
     for (auto &quad_row : quads_) {

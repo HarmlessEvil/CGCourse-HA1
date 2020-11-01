@@ -70,10 +70,9 @@ void main() {
 vec3 calculate_texture_color() {
     float depth = v_out.screen_space_position.z / v_out.screen_space_position.w;
     vec3 color = texture(u_tex, v_out.texture_coordinates).rgb;
-    vec2 coordinates = v_out.screen_space_position.xy * 0.5 + 0.5;
 
     if (depth < 0.95) {
-        vec4 detail_color = texture(u_detail_tex, vec3(coordinates / 4, v_out.texture_coordinates.z));
+        vec4 detail_color = texture(u_detail_tex, vec3(v_out.texture_coordinates.xy * 50, v_out.texture_coordinates.z));
         color *= detail_color.rgb * 2.5;
     }
 

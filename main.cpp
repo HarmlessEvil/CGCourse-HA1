@@ -579,7 +579,8 @@ int main(int, char **) {
 //            static float size = 750;
 //            ImGui::SliderFloat("size", &size, 1, 750);
 //            static glm::vec3 target;
-//            ImGui::SliderFloat3("target", glm::value_ptr(target), -1000, 1000);
+//            ImGui::SliderFloat2("local position", glm::value_ptr(player.position_), -1000, 1000);
+//            ImGui::SliderFloat3("world position", glm::value_ptr(player.world_position_), -1000, 1000);
 //            static glm::vec3 translation = {0.0, 0.0, 0.0};
 //            ImGui::SliderFloat3("Sun direction", glm::value_ptr(sun->direction_), -1000, 1000);
 //            ImGui::ColorEdit3("Position", const_cast<float *>(glm::value_ptr(glm::abs(glm::normalize(flashlight->position_)))));

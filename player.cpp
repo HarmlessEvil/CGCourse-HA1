@@ -4,7 +4,6 @@
 
 #include "player.hpp"
 
-#include <sstream>
 #include <utility>
 
 #include <fmt/format.h>
@@ -35,8 +34,8 @@ player::player(
             1,
             0.03,
             0.016,
-            glm::cos(glm::radians(12.5)),
-            glm::cos(glm::radians(17.5))
+            glm::cos(glm::radians(25.5)),
+            glm::cos(glm::radians(35.5))
     )),
     shadow_casters_(std::move(shadow_casters)) {
 
@@ -77,14 +76,10 @@ void player::move(float speed, float angle) {
 
     glm::vec2 direction = glm::rotate(glm::vec2(1, 0), angle_);
     set_position(position_ + direction * speed);
-
-    update();
 }
 
 void player::set_position(const glm::vec2 &position) {
     position_ = position;
-    flashlight_->set_position(terrain_->at(position_));
-
     update();
 }
 
@@ -118,6 +113,7 @@ void player::update() {
             camera_terrain_position
     ) * camera_->shift().z;
     camera_->set_position(camera_position);
+    flashlight_->set_position(world_position_);
     flashlight_->set_direction(world_position_ - camera_ground_position);
 
     glm::vec4 const &tangent = terrain_->tangent_at(position_);
