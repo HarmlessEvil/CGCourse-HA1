@@ -1,5 +1,6 @@
 #pragma optimize("", off)
 
+#include <chrono>
 #include <memory>
 #include <vector>
 
@@ -525,16 +526,16 @@ int main(int, char **) {
                 float angle{};
 
                 if (ImGui::IsKeyPressed('w') || ImGui::IsKeyPressed('W')) {
-                    speed += 0.5;
+                    speed += 15 * io.DeltaTime;
                 }
                 if (ImGui::IsKeyPressed('s') || ImGui::IsKeyPressed('S')) {
-                    speed -= 0.5;
+                    speed -= 15 * io.DeltaTime;
                 }
                 if (ImGui::IsKeyPressed('a') || ImGui::IsKeyPressed('A')) {
-                    angle += 2;
+                    angle += 90 * io.DeltaTime;
                 }
                 if (ImGui::IsKeyPressed('d') || ImGui::IsKeyPressed('D')) {
-                    angle -= 2;
+                    angle -= 90 * io.DeltaTime;
                 }
 
                 if (std::abs(speed) < 1e-6) {
